@@ -46,25 +46,20 @@ private struct OptionalHeader {
         optionalFields = try reader.readBytes(Int(pesHeaderLength))
     }
 
-    mutating func setTimestamp(
-        _ timestamp: CMTime,
-        _ presentationTimeStamp: CMTime,
-        _ decodeTimeStamp: CMTime
-    ) {
-        let base = Double(timestamp.seconds)
-        if presentationTimeStamp != CMTime.invalid {
+    mutating func setTimestamp(_ presentationTimeStamp: CMTime, _ decodeTimeStamp: CMTime) {
+        if presentationTimeStamp != .invalid {
             ptsDtsIndicator |= 0x02
         }
-        if decodeTimeStamp != CMTime.invalid {
+        if decodeTimeStamp != .invalid {
             ptsDtsIndicator |= 0x01
         }
         if (ptsDtsIndicator & 0x02) == 0x02 {
-            let pts = Int64((presentationTimeStamp.seconds - base) * Double(TSTimestamp.resolution))
-            optionalFields += TSTimestamp.encode(pts, ptsDtsIndicator << 4)
+            let presentationTimeStamp = Int64(presentationTimeStamp.seconds * Double(TSTimestamp.resolution))
+            optionalFields += TSTimestamp.encode(presentationTimeStamp, ptsDtsIndicator << 4)
         }
         if (ptsDtsIndicator & 0x01) == 0x01 {
-            let dts = Int64((decodeTimeStamp.seconds - base) * Double(TSTimestamp.resolution))
-            optionalFields += TSTimestamp.encode(dts, 0x01 << 4)
+            let decodeTimeStamp = Int64(decodeTimeStamp.seconds * Double(TSTimestamp.resolution))
+            optionalFields += TSTimestamp.encode(decodeTimeStamp, 0x01 << 4)
         }
         pesHeaderLength = UInt8(optionalFields.count)
     }
@@ -92,30 +87,26 @@ private struct OptionalHeader {
             .data
     }
 
-    func makeSampleTimingInfo(_ baseTimeStamp: CMTime,
-                              _ previousPresentationTimeStamp: CMTime) -> CMSampleTimingInfo?
-    {
+    func getPresentationTimeStamp() -> CMTime {
         var presentationTimeStamp: CMTime = .invalid
-        var decodeTimeStamp: CMTime = .invalid
         if ptsDtsIndicator & 0x02 == 0x02 {
-            let pts = TSTimestamp.decode(optionalFields, offset: 0)
-            presentationTimeStamp = baseTimeStamp + .init(
-                value: pts,
+            presentationTimeStamp = .init(
+                value: TSTimestamp.decode(optionalFields, offset: 0),
                 timescale: CMTimeScale(TSTimestamp.resolution)
             )
         }
+        return presentationTimeStamp
+    }
+
+    func getDecodeTimeStamp() -> CMTime {
+        var decodeTimeStamp: CMTime = .invalid
         if ptsDtsIndicator & 0x01 == 0x01 {
-            let dts = TSTimestamp.decode(optionalFields, offset: TSTimestamp.dataSize)
-            decodeTimeStamp = baseTimeStamp + .init(
-                value: dts,
+            decodeTimeStamp = .init(
+                value: TSTimestamp.decode(optionalFields, offset: TSTimestamp.dataSize),
                 timescale: CMTimeScale(TSTimestamp.resolution)
             )
         }
-        return CMSampleTimingInfo(
-            duration: presentationTimeStamp - previousPresentationTimeStamp,
-            presentationTimeStamp: presentationTimeStamp,
-            decodeTimeStamp: decodeTimeStamp
-        )
+        return decodeTimeStamp
     }
 }
 
@@ -132,14 +123,13 @@ struct MpegTsPacketizedElementaryStream {
         bytes: UnsafePointer<UInt8>,
         count: UInt32,
         presentationTimeStamp: CMTime,
-        timestamp: CMTime,
         config: MpegTsAudioConfig,
         streamID: UInt8
     ) {
         data.append(contentsOf: config.makeHeader(Int(count)))
         data.append(bytes, count: Int(count))
         optionalHeader.dataAlignmentIndicator = true
-        optionalHeader.setTimestamp(timestamp, presentationTimeStamp, CMTime.invalid)
+        optionalHeader.setTimestamp(presentationTimeStamp, .invalid)
         let length = data.count + optionalHeader.encode().count
         if length < Int(UInt16.max) {
             packetLength = UInt16(length)
@@ -154,7 +144,6 @@ struct MpegTsPacketizedElementaryStream {
         count: Int,
         presentationTimeStamp: CMTime,
         decodeTimeStamp: CMTime,
-        timestamp: CMTime,
         config: MpegTsVideoConfigAvc?,
         streamID: UInt8
     ) {
@@ -171,7 +160,7 @@ struct MpegTsPacketizedElementaryStream {
         let stream = AvcFormatStream(bytes: bytes, count: count)
         data.append(stream.toByteStream())
         optionalHeader.dataAlignmentIndicator = true
-        optionalHeader.setTimestamp(timestamp, presentationTimeStamp, decodeTimeStamp)
+        optionalHeader.setTimestamp(presentationTimeStamp, decodeTimeStamp)
         let length = data.count + optionalHeader.encode().count
         if length < Int(UInt16.max) {
             packetLength = UInt16(length)
@@ -184,7 +173,6 @@ struct MpegTsPacketizedElementaryStream {
         count: Int,
         presentationTimeStamp: CMTime,
         decodeTimeStamp: CMTime,
-        timestamp: CMTime,
         config: MpegTsVideoConfigHevc?,
         streamID: UInt8
     ) {
@@ -205,7 +193,7 @@ struct MpegTsPacketizedElementaryStream {
         let stream = AvcFormatStream(bytes: bytes, count: count)
         data.append(stream.toByteStream())
         optionalHeader.dataAlignmentIndicator = true
-        optionalHeader.setTimestamp(timestamp, presentationTimeStamp, decodeTimeStamp)
+        optionalHeader.setTimestamp(presentationTimeStamp, decodeTimeStamp)
         let length = data.count + optionalHeader.encode().count
         if length < Int(UInt16.max) {
             packetLength = UInt16(length)
@@ -294,9 +282,10 @@ struct MpegTsPacketizedElementaryStream {
     mutating func makeSampleBuffer(
         _ streamType: ElementaryStreamType,
         _ basePresentationTimeStamp: CMTime,
-        _ previousPresentationTimeStamp: CMTime,
+        _ firstReceivedPresentationTimeStamp: CMTime?,
+        _ previousReceivedPresentationTimeStamp: CMTime?,
         _ formatDescription: CMFormatDescription?
-    ) -> CMSampleBuffer? {
+    ) -> (CMSampleBuffer, CMTime, CMTime)? {
         var blockBuffer: CMBlockBuffer?
         var sampleSizes: [Int] = []
         switch streamType {
@@ -316,10 +305,25 @@ struct MpegTsPacketizedElementaryStream {
             break
         }
         var sampleBuffer: CMSampleBuffer?
-        var timing = optionalHeader.makeSampleTimingInfo(
-            basePresentationTimeStamp,
-            previousPresentationTimeStamp
-        ) ?? .invalid
+        let receivedPresentationTimeStamp = optionalHeader.getPresentationTimeStamp()
+        let receivedDecodeTimeStamp = optionalHeader.getDecodeTimeStamp()
+        var timing = CMSampleTimingInfo()
+        var firstReceivedPresentationTimeStamp = firstReceivedPresentationTimeStamp
+        if let firstReceivedPresentationTimeStamp {
+            let basePresentationTimeStamp = basePresentationTimeStamp - firstReceivedPresentationTimeStamp
+            timing.presentationTimeStamp = basePresentationTimeStamp + receivedPresentationTimeStamp
+            timing.decodeTimeStamp = basePresentationTimeStamp + receivedDecodeTimeStamp
+            if let previousReceivedPresentationTimeStamp {
+                timing.duration = timing.presentationTimeStamp - previousReceivedPresentationTimeStamp
+            } else {
+                timing.duration = .invalid
+            }
+        } else {
+            timing.presentationTimeStamp = basePresentationTimeStamp
+            timing.decodeTimeStamp = basePresentationTimeStamp
+            timing.duration = .invalid
+            firstReceivedPresentationTimeStamp = receivedPresentationTimeStamp
+        }
         guard let blockBuffer, CMSampleBufferCreate(
             allocator: kCFAllocatorDefault,
             dataBuffer: blockBuffer,
@@ -336,6 +340,9 @@ struct MpegTsPacketizedElementaryStream {
         ) == noErr else {
             return nil
         }
-        return sampleBuffer
+        guard let sampleBuffer else {
+            return nil
+        }
+        return (sampleBuffer, firstReceivedPresentationTimeStamp!, timing.presentationTimeStamp)
     }
 }

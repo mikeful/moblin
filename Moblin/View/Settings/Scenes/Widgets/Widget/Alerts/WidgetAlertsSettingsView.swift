@@ -105,14 +105,6 @@ private struct AlertMediaView: View {
     }
 }
 
-private enum AnchorPoint {
-    case topLeft
-    case topRight
-    case bottomLeft
-    case bottomRight
-    case center
-}
-
 private struct AlertPositionFaceView: View {
     @EnvironmentObject var model: Model
     var alert: SettingsWidgetAlertsAlert
@@ -123,105 +115,30 @@ private struct AlertPositionFaceView: View {
     @State private var imageHeight: CGFloat = 100
     @State private var imageOffset: CGSize = .init(width: 0, height: 0)
 
-    private func calculateFacePositionAnchorPoint(location: CGPoint, size: CGSize) -> (AnchorPoint?, CGSize) {
-        let x = location.x / size.width
-        let y = location.y / size.height
-        let xTopLeft = alert.facePosition!.x
-        let yTopLeft = alert.facePosition!.y
-        let xBottomRight = alert.facePosition!.x + alert.facePosition!.width
-        let yBottomRight = alert.facePosition!.y + alert.facePosition!.height
-        let xCenter = xTopLeft + alert.facePosition!.width / 2
-        let yCenter = yTopLeft + alert.facePosition!.height / 2
-        let xCenterTopLeft = xTopLeft + alert.facePosition!.width / 4
-        let yCenterTopLeft = yTopLeft + alert.facePosition!.height / 4
-        let xCenterBottomRight = xBottomRight - alert.facePosition!.width / 4
-        let yCenterBottomRight = yBottomRight - alert.facePosition!.height / 4
-        if x > xCenterTopLeft && x < xCenterBottomRight && y > yCenterTopLeft && y < yCenterBottomRight {
-            return (.center, .init(width: CGFloat(xCenter - x), height: CGFloat(yCenter - y)))
-        } else if x + 0.1 < xTopLeft || x > xBottomRight + 0.1 || y + 0.1 < yTopLeft || y > yBottomRight +
-            0.1
-        {
-            return (.center, .init(width: CGFloat(xCenter - x), height: CGFloat(yCenter - y)))
-        } else if x < xCenterTopLeft && y < yCenterTopLeft {
-            return (.topLeft, .init(width: CGFloat(xTopLeft - x), height: CGFloat(yTopLeft - y)))
-        } else if x > xCenterBottomRight && y < yCenterTopLeft {
-            return (.topRight, .init(width: CGFloat(xBottomRight - x), height: CGFloat(yTopLeft - y)))
-        } else if x < xCenterTopLeft && y > yCenterBottomRight {
-            return (.bottomLeft, .init(width: CGFloat(xTopLeft - x), height: CGFloat(yBottomRight - y)))
-        } else if x > xCenterBottomRight && y > yCenterBottomRight {
-            return (.bottomRight, .init(width: CGFloat(xBottomRight - x), height: CGFloat(yBottomRight - y)))
-        } else {
-            return (nil, .zero)
-        }
-    }
-
     private func updateFacePositionAnchorPoint(location: CGPoint, size: CGSize) {
         if facePositionAnchorPoint == nil {
-            (facePositionAnchorPoint, facePositionOffset) = calculateFacePositionAnchorPoint(
-                location: location,
-                size: size
+            (facePositionAnchorPoint, facePositionOffset) = calculatePositioningAnchorPoint(
+                location,
+                size,
+                alert.facePosition!.x,
+                alert.facePosition!.y,
+                alert.facePosition!.width,
+                alert.facePosition!.height
             )
         }
     }
 
     private func createFacePositionPathAndUpdateImage(size: CGSize) -> Path {
-        var xTopLeft = alert.facePosition!.x
-        var yTopLeft = alert.facePosition!.y
-        var xBottomRight = xTopLeft + alert.facePosition!.width
-        var yBottomRight = yTopLeft + alert.facePosition!.height
-        let facePositionX = ((facePosition.x) / size.width + facePositionOffset.width)
-            .clamped(to: 0 ... 1)
-        let facePositionY = ((facePosition.y) / size.height + facePositionOffset.height)
-            .clamped(to: 0 ... 1)
-        let minimumWidth = 0.05
-        let minimumHeight = 0.04
-        switch facePositionAnchorPoint {
-        case .topLeft:
-            if facePositionX + minimumWidth < xBottomRight {
-                xTopLeft = facePositionX
-            }
-            if facePositionY + minimumHeight < yBottomRight {
-                yTopLeft = facePositionY
-            }
-        case .topRight:
-            if facePositionX > xTopLeft + minimumWidth {
-                xBottomRight = facePositionX
-            }
-            if facePositionY + minimumHeight < yBottomRight {
-                yTopLeft = facePositionY
-            }
-        case .bottomLeft:
-            if facePositionX + minimumWidth < xBottomRight {
-                xTopLeft = facePositionX
-            }
-            if facePositionY > yTopLeft + minimumHeight {
-                yBottomRight = facePositionY
-            }
-        case .bottomRight:
-            if facePositionX > xTopLeft + minimumWidth {
-                xBottomRight = facePositionX
-            }
-            if facePositionY > yTopLeft + minimumHeight {
-                yBottomRight = facePositionY
-            }
-        case .center:
-            let halfWidth = alert.facePosition!.width / 2
-            let halfHeight = alert.facePosition!.height / 2
-            var x = alert.facePosition!.x
-            var y = alert.facePosition!.y
-            if facePositionX - halfWidth >= 0 && facePositionX + halfWidth <= 1 {
-                x = facePositionX - halfWidth
-            }
-            if facePositionY - halfHeight >= 0 && facePositionY + halfHeight <= 1 {
-                y = facePositionY - halfHeight
-            }
-            xTopLeft = x
-            yTopLeft = y
-            xBottomRight = x + alert.facePosition!.width
-            yBottomRight = y + alert.facePosition!.height
-        case nil:
-            break
-        }
+        let (xTopLeft, yTopLeft, xBottomRight, yBottomRight) = calculatePositioningRectangle(
+            facePositionAnchorPoint,
+            alert.facePosition!.x,
+            alert.facePosition!.y,
+            alert.facePosition!.width,
+            alert.facePosition!.height,
+            facePosition,
+            size,
+            facePositionOffset
+        )
         alert.facePosition!.x = xTopLeft
         alert.facePosition!.y = yTopLeft
         alert.facePosition!.width = xBottomRight - xTopLeft
@@ -230,21 +147,7 @@ private struct AlertPositionFaceView: View {
         let yPoints = CGFloat(alert.facePosition!.y) * size.height
         let widthPoints = CGFloat(alert.facePosition!.width) * size.width
         let heightPoints = CGFloat(alert.facePosition!.height) * size.height
-        var path = Path()
-        path.move(to: .init(x: xPoints, y: yPoints))
-        path.addLine(to: .init(x: xPoints + widthPoints, y: yPoints))
-        path.addLine(to: .init(x: xPoints + widthPoints, y: yPoints + heightPoints))
-        path.addLine(to: .init(x: xPoints, y: yPoints + heightPoints))
-        path.addLine(to: .init(x: xPoints, y: yPoints))
-        path.addEllipse(in: .init(x: xPoints - 5, y: yPoints - 5, width: 10, height: 10))
-        path.addEllipse(in: .init(x: xPoints + widthPoints - 5, y: yPoints - 5, width: 10, height: 10))
-        path.addEllipse(in: .init(
-            x: xPoints + widthPoints - 5,
-            y: yPoints + heightPoints - 5,
-            width: 10,
-            height: 10
-        ))
-        path.addEllipse(in: .init(x: xPoints - 5, y: yPoints + heightPoints - 5, width: 10, height: 10))
+        let path = drawPositioningRectangle(xPoints, yPoints, widthPoints, heightPoints)
         imageWidth = widthPoints
         imageHeight = heightPoints
         imageOffset = .init(
@@ -473,9 +376,27 @@ private struct TwitchRaidsView: View {
     }
 }
 
-private struct TwitchCheersView: View {
+private func formatTitle(cheerBit: SettingsWidgetAlertsCheerBitsAlert) -> String {
+    let bits = countFormatter.format(cheerBit.bits)
+    switch cheerBit.comparisonOperator {
+    case .equal:
+        if cheerBit.bits == 1 {
+            return "Cheer \(bits) bit"
+        } else {
+            return "Cheer \(bits) bits"
+        }
+    case .greaterEqual:
+        return "Cheer \(bits)+ bits"
+    }
+}
+
+private struct TwitchCheerView: View {
     @EnvironmentObject var model: Model
-    var alert: SettingsWidgetAlertsAlert
+    var cheerBit: SettingsWidgetAlertsCheerBitsAlert
+
+    private var alert: SettingsWidgetAlertsAlert {
+        return cheerBit.alert
+    }
 
     var body: some View {
         Form {
@@ -508,7 +429,7 @@ private struct TwitchCheersView: View {
                     let event = TwitchEventSubChannelCheerEvent(
                         user_name: testNames.randomElement()!,
                         message: "A test message!",
-                        bits: .random(in: 1 ..< 1000)
+                        bits: cheerBit.bits
                     )
                     model.testAlert(alert: .twitchCheer(event))
                 }, label: {
@@ -518,6 +439,25 @@ private struct TwitchCheersView: View {
                         Spacer()
                     }
                 })
+            }
+        }
+        .navigationTitle(formatTitle(cheerBit: cheerBit))
+    }
+}
+
+private struct TwitchCheerBitsView: View {
+    var cheerBits: [SettingsWidgetAlertsCheerBitsAlert]
+
+    var body: some View {
+        Form {
+            List {
+                ForEach(cheerBits) { cheerBit in
+                    NavigationLink {
+                        TwitchCheerView(cheerBit: cheerBit)
+                    } label: {
+                        Text(formatTitle(cheerBit: cheerBit))
+                    }
+                }
             }
         }
         .navigationTitle("Cheers")
@@ -593,7 +533,7 @@ private struct WidgetAlertsSettingsTwitchView: View {
                     Text("Raids")
                 }
                 NavigationLink {
-                    TwitchCheersView(alert: twitch.cheers!)
+                    TwitchCheerBitsView(cheerBits: twitch.cheerBits!)
                 } label: {
                     Text("Cheers")
                 }

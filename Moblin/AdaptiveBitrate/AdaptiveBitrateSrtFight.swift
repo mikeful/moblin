@@ -236,7 +236,7 @@ class AdaptiveBitrateSrtFight: AdaptiveBitrate {
                 currentMaximumBitrate = maximumBitrate
             }
         }
-        let minimumBitrate = max(250_000, settings.minimumBitrate)
+        let minimumBitrate = max(50000, settings.minimumBitrate)
         if currentMaximumBitrate < minimumBitrate {
             currentMaximumBitrate = minimumBitrate
         }

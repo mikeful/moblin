@@ -51,7 +51,7 @@ struct QuickButtonPlaceholderImage: View {
 }
 
 private func startStopText(button: ButtonState) -> String {
-    return button.isOn ? "Stop" : "Start"
+    return button.isOn ? String(localized: "Stop") : String(localized: "Start")
 }
 
 struct QuickButtonsInnerView: View {
@@ -241,6 +241,14 @@ struct QuickButtonsInnerView: View {
 
     private func recordingsAction(state _: ButtonState) {
         model.toggleShowingPanel(type: .recordings, panel: .recordings)
+    }
+
+    private func skipCurrentTtsAction(state _: ButtonState) {
+        model.chatTextToSpeech.skipCurrentMessage()
+    }
+
+    private func streamMarkerAction(state _: ButtonState) {
+        model.createStreamMarker()
     }
 
     var body: some View {
@@ -485,6 +493,18 @@ struct QuickButtonsInnerView: View {
                         model.startAds(seconds: 180)
                     }
                 }
+            case .skipCurrentTts:
+                Button(action: {
+                    skipCurrentTtsAction(state: state)
+                }, label: {
+                    QuickButtonImage(state: state, buttonSize: size)
+                })
+            case .streamMarker:
+                Button(action: {
+                    streamMarkerAction(state: state)
+                }, label: {
+                    QuickButtonImage(state: state, buttonSize: size)
+                })
             }
             if model.database.quickButtons!
                 .showName && !(model.stream.portrait! || model.database.portrait!)

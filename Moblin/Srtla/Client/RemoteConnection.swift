@@ -137,10 +137,7 @@ class RemoteConnection {
 
     func stop(reason: String) {
         let sent = sizeFormatter.string(fromByteCount: Int64(totalDataSentByteCount))
-        logger
-            .info(
-                "srtla: \(typeString): Stop with reason: \(reason) (\(sent) sent)"
-            )
+        logger.info("srtla: \(typeString): Stop with reason: \(reason) (\(sent) sent)")
         connection?.cancel()
         connection = nil
         cancelAllTimers()
@@ -309,30 +306,8 @@ class RemoteConnection {
     }
 
     private func handleSrtNak(packet: Data) {
-        var offset = 16
-        while offset <= packet.count - 4 {
-            let nakSn = packet.getUInt32Be(offset: offset)
-            offset += 4
-            if isSnRange(sn: nakSn) {
-                guard offset <= packet.count - 4 else {
-                    logger
-                        .error(
-                            """
-                            srtla: \(typeString): Missing second sequence number in \
-                            range nak at offset \(offset) with packet length \(packet
-                                .count)
-                            """
-                        )
-                    return
-                }
-                let upToNakSn = packet.getUInt32Be(offset: offset)
-                for sn in stride(from: nakSn & 0x7FFF_FFFF, through: upToNakSn, by: 1) {
-                    onSrtNak?(sn)
-                }
-                offset += 4
-            } else {
-                onSrtNak?(nakSn)
-            }
+        processSrtNak(packet: packet) { sn in
+            self.onSrtNak?(sn)
         }
     }
 
@@ -417,6 +392,7 @@ class RemoteConnection {
     }
 
     private func handleSrtlaControlPacket(type: SrtlaPacketType, packet: Data) {
+        // logger.info("xxx got SRTLA control packet \(type) \(packet)")
         switch type {
         case .keepalive:
             handleSrtlaKeepalive()
@@ -438,6 +414,7 @@ class RemoteConnection {
     }
 
     private func handleSrtControlPacket(type: SrtPacketType, packet: Data) {
+        // logger.info("xxx got SRT control packet \(type) \(packet)")
         guard packet.count >= 16 else {
             return
         }
@@ -446,9 +423,124 @@ class RemoteConnection {
             handleSrtAck(packet: packet)
         case .nak:
             handleSrtNak(packet: packet)
+//        case .handshake:
+//            logHandshake(packet: packet)
         default:
             break
         }
+    }
+
+    // periphery:ignore
+    private func logHandshake(packet: Data) {
+        guard packet.count >= 64 else {
+            return
+        }
+        do {
+            let reader = ByteArray(data: packet)
+            // 8000 0000 - type
+            // 0000 0000 - ignored
+            // a7f8 7e20 - timestamp
+            // 12ae beca - socket id
+            _ = try reader.readBytes(16)
+            // 0000 0005 - HS version (5)
+            let version = try reader.readUInt32()
+            // 0000 4a17
+            _ = try reader.readBytes(4)
+            // 1ce0 9952 - Initial SN
+            let initialSn = try reader.readUInt32()
+            // 0000 05dc - MTU (1500)
+            let mtu = try reader.readUInt32()
+            // 0000 2000 - max win size (8192)
+            let maxWindowSize = try reader.readUInt32()
+            // 0000 0001 - type INDUCTION
+            var handshakeType: String
+            switch try reader.readUInt32() {
+            case 0xFFFF_FFFD:
+                handshakeType = "DONE"
+            case 0xFFFF_FFFE:
+                handshakeType = "AGREEMENT"
+            case 0xFFFF_FFFF:
+                handshakeType = "CONCLUSION"
+            case 0x0000_0000:
+                handshakeType = "WAVEAHAND"
+            case 0x0000_0001:
+                handshakeType = "INDUCTION"
+            default:
+                handshakeType = "UNKNOWN"
+            }
+            // 12ae beca - socket id
+            // 43f7 8206 - SYN cookie
+            // 0100 007f - peer IP address
+            // 0000 0000 -
+            // 0000 0000 -
+            // 0000 0000 -
+            _ = try reader.readBytes(24)
+            logger.info("""
+            xxx handshake version=\(version) initialSn=\(initialSn) mtu=\(mtu) \
+            maxWindowSize=\(maxWindowSize) handshakeType=\(handshakeType)
+            """)
+            while reader.bytesAvailable > 0 {
+                // 0002 0003
+                let extensionTypeMap: [UInt16: String] = [
+                    1: "SRT_CMD_HSREQ",
+                    2: "SRT_CMD_HSRSP",
+                    3: "SRT_CMD_KMREQ",
+                    4: "SRT_CMD_KMRSP",
+                    5: "SRT_CMD_SID",
+                    6: "SRT_CMD_CONGESTION",
+                    7: "SRT_CMD_FILTER",
+                    8: "SRT_CMD_GROUP",
+                ]
+                let extensionType = try reader.readUInt16()
+                let extensionTypeString = extensionTypeMap[extensionType] ?? "UNKNOWN"
+                if extensionType == 1 || extensionType == 2 {
+                    _ = try reader.readUInt16()
+                    // 0001 0402
+                    let srtVersionMajor = try reader.readUInt16()
+                    let srtVersionMinor = try reader.readUInt8()
+                    let srtVersionPatch = try reader.readUInt8()
+                    // 0000 00bf
+                    let srtFlags = try reader.readUInt32()
+                    var srtFlagsString = ""
+                    if srtFlags & 0x0000_0001 == 0x0000_0001 {
+                        srtFlagsString += "TSBPDSND,"
+                    }
+                    if srtFlags & 0x0000_0002 == 0x0000_0002 {
+                        srtFlagsString += "TSBPDRCV,"
+                    }
+                    if srtFlags & 0x0000_0004 == 0x0000_0004 {
+                        srtFlagsString += "CRYPT,"
+                    }
+                    if srtFlags & 0x0000_0008 == 0x0000_0008 {
+                        srtFlagsString += "TLPKTDROP,"
+                    }
+                    if srtFlags & 0x0000_0010 == 0x0000_0010 {
+                        srtFlagsString += "PERIODICNAK,"
+                    }
+                    if srtFlags & 0x0000_0020 == 0x0000_0020 {
+                        srtFlagsString += "REXMITFLG,"
+                    }
+                    if srtFlags & 0x0000_0040 == 0x0000_0040 {
+                        srtFlagsString += "STREAM,"
+                    }
+                    if srtFlags & 0x0000_0080 == 0x0000_0080 {
+                        srtFlagsString += "PACKET_FILTER,"
+                    }
+                    // 07d0 07d0
+                    let receiverTsbpdDelay = try reader.readUInt16()
+                    let senderTsbpdDelay = try reader.readUInt16()
+                    logger.info("""
+                    xxx handshake extension extensionType=\(extensionTypeString) \
+                    srtVersion=\(srtVersionMajor).\(srtVersionMinor).\(srtVersionPatch) \
+                    srtFlags=\(srtFlagsString) receiverTsbpdDelay=\(
+                        receiverTsbpdDelay
+                    ) senderTsbpdDelay=\(senderTsbpdDelay)
+                    """)
+                } else {
+                    logger.info("xxx handshake extension extensionType=\(extensionTypeString)")
+                }
+            }
+        } catch {}
     }
 
     private func handleControlPacket(packet: Data) {

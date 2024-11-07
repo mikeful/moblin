@@ -10,7 +10,8 @@ class SrtServerClient {
     private var packetizedElementaryStreams: [UInt16: MpegTsPacketizedElementaryStream] = [:]
     private var formatDescriptions: [UInt16: CMFormatDescription] = [:]
     private var nalUnitReader = NALUnitReader()
-    private var previousPresentationTimeStamps: [UInt16: CMTime] = [:]
+    private var firstReceivedPresentationTimeStamp: CMTime?
+    private var previousReceivedPresentationTimeStamps: [UInt16: CMTime] = [:]
     private var basePresentationTimeStamp: CMTime = .invalid
     private var audioBuffer: AVAudioCompressedBuffer?
     private var latestAudioBufferPresentationTimeStamp: CMTime?
@@ -42,6 +43,8 @@ class SrtServerClient {
             do {
                 while reader.bytesAvailable >= MpegTsPacket.size {
                     let packet = try MpegTsPacket(reader: reader)
+                    // logger.info("srt-server: Packet random access \(packet.adaptationField?.randomAccessIndicator)
+                    // payload start \(packet.payloadUnitStartIndicator)")
                     if packet.id == MpegTsPacket.programAssociationTableId {
                         try handleProgramAssociationTable(packet: packet)
                     } else if let programNumber = programs[packet.id] {
@@ -211,7 +214,14 @@ class SrtServerClient {
     }
 
     private func handleVideoSampleBuffer(_ sampleBuffer: CMSampleBuffer) {
-        videoDecoder?.decodeSampleBuffer(sampleBuffer)
+        // logger.info("srt-server: Decoding sample buffer with sync \(sampleBuffer.isSync)
+        // data size \(sampleBuffer.dataBuffer?.dataLength ?? -1)")
+        guard let videoDecoder else {
+            return
+        }
+        videoCodecLockQueue.async {
+            videoDecoder.decodeSampleBuffer(sampleBuffer)
+        }
     }
 
     private func handleAudioFormatDescription(_ formatDescription: CMFormatDescription) {
@@ -247,9 +257,9 @@ class SrtServerClient {
     }
 
     private func handleVideoFormatDescription(_ formatDescription: CMFormatDescription) {
-        guard videoDecoder == nil else {
-            return
-        }
+        let dimentions = CMVideoFormatDescriptionGetDimensions(formatDescription)
+        logger.info("srt-server: Got new video dimensions \(dimentions)")
+        videoDecoder?.stopRunning()
         videoDecoder = VideoCodec(lockQueue: videoCodecLockQueue)
         videoDecoder?.formatDescription = formatDescription
         videoDecoder?.delegate = self
@@ -305,16 +315,20 @@ class SrtServerClient {
             formatDescriptions[packetId] = formatDescription
             handleAudioFormatDescription(formatDescription)
         }
-        guard let sampleBuffer = packetizedElementaryStream.makeSampleBuffer(
+        guard let (sampleBuffer,
+                   firstReceivedPresentationTimeStamp,
+                   previousReceivedPresentationTimeStamp) = packetizedElementaryStream.makeSampleBuffer(
             data.streamType,
             getBasePresentationTimeStamp(),
-            previousPresentationTimeStamps[packetId] ?? .invalid,
+            firstReceivedPresentationTimeStamp,
+            previousReceivedPresentationTimeStamps[packetId],
             formatDescriptions[packetId]
         ) else {
             return nil
         }
         sampleBuffer.isSync = true
-        previousPresentationTimeStamps[packetId] = sampleBuffer.presentationTimeStamp
+        self.firstReceivedPresentationTimeStamp = firstReceivedPresentationTimeStamp
+        previousReceivedPresentationTimeStamps[packetId] = previousReceivedPresentationTimeStamp
         return (sampleBuffer, data.streamType)
     }
 
@@ -334,16 +348,20 @@ class SrtServerClient {
             formatDescriptions[packetId] = formatDescription
             handleVideoFormatDescription(formatDescription)
         }
-        guard let sampleBuffer = packetizedElementaryStream.makeSampleBuffer(
+        guard let (sampleBuffer,
+                   firstReceivedPresentationTimeStamp,
+                   previousReceivedPresentationTimeStamp) = packetizedElementaryStream.makeSampleBuffer(
             data.streamType,
             getBasePresentationTimeStamp(),
-            previousPresentationTimeStamps[packetId] ?? .invalid,
+            firstReceivedPresentationTimeStamp,
+            previousReceivedPresentationTimeStamps[packetId],
             formatDescriptions[packetId]
         ) else {
             return nil
         }
         sampleBuffer.isSync = units.contains { $0.type == .idr }
-        previousPresentationTimeStamps[packetId] = sampleBuffer.presentationTimeStamp
+        self.firstReceivedPresentationTimeStamp = firstReceivedPresentationTimeStamp
+        previousReceivedPresentationTimeStamps[packetId] = previousReceivedPresentationTimeStamp
         return (sampleBuffer, data.streamType)
     }
 
@@ -358,16 +376,20 @@ class SrtServerClient {
             formatDescriptions[packetId] = formatDescription
             handleVideoFormatDescription(formatDescription)
         }
-        guard let sampleBuffer = packetizedElementaryStream.makeSampleBuffer(
+        guard let (sampleBuffer,
+                   firstReceivedPresentationTimeStamp,
+                   previousReceivedPresentationTimeStamp) = packetizedElementaryStream.makeSampleBuffer(
             data.streamType,
             getBasePresentationTimeStamp(),
-            previousPresentationTimeStamps[packetId] ?? .invalid,
+            firstReceivedPresentationTimeStamp,
+            previousReceivedPresentationTimeStamps[packetId],
             formatDescriptions[packetId]
         ) else {
             return nil
         }
         sampleBuffer.isSync = units.contains { $0.type == .sps }
-        previousPresentationTimeStamps[packetId] = sampleBuffer.presentationTimeStamp
+        self.firstReceivedPresentationTimeStamp = firstReceivedPresentationTimeStamp
+        previousReceivedPresentationTimeStamps[packetId] = previousReceivedPresentationTimeStamp
         return (sampleBuffer, data.streamType)
     }
 
@@ -381,9 +403,14 @@ class SrtServerClient {
 }
 
 extension SrtServerClient: VideoCodecDelegate {
-    func videoCodecOutputFormat(_: VideoCodec, _: CMFormatDescription) {}
+    func videoCodecOutputFormat(_: VideoCodec, _: CMFormatDescription) {
+        // logger.info("srt-server: Decoded format description
+        // \(CMVideoFormatDescriptionGetDimensions(formatDescription))")
+    }
 
     func videoCodecOutputSampleBuffer(_: VideoCodec, _ sampleBuffer: CMSampleBuffer) {
+        // logger.info("srt-server: Decoded frame dimensions
+        // \(sampleBuffer.imageBuffer?.width ?? -1) \(sampleBuffer.imageBuffer?.height ?? -1)")
         server?.srtlaServer?.delegate?.srtlaServerOnVideoBuffer(
             streamId: streamId,
             sampleBuffer: sampleBuffer

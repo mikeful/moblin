@@ -28,8 +28,8 @@ extension RTMPMuxer: AudioCodecDelegate {
     }
 
     func audioCodecOutputBuffer(_ buffer: AVAudioBuffer, _ presentationTimeStamp: CMTime) {
-        let delta = (audioTimeStamp == CMTime.zero ? 0 : presentationTimeStamp.seconds - audioTimeStamp
-            .seconds) * 1000
+        let delta = (audioTimeStamp == .zero ? 0 : presentationTimeStamp.seconds - audioTimeStamp.seconds) *
+            1000
         guard let audioBuffer = buffer as? AVAudioCompressedBuffer, delta >= 0 else {
             return
         }
@@ -46,7 +46,7 @@ extension RTMPMuxer: AudioCodecDelegate {
 extension RTMPMuxer: VideoCodecDelegate {
     func videoCodecOutputFormat(_ codec: VideoCodec, _ formatDescription: CMFormatDescription) {
         var buffer: Data
-        switch codec.settings.format {
+        switch codec.settings.value.format {
         case .h264:
             guard let avcC = MpegTsVideoConfigAvc.getData(formatDescription) else {
                 return
@@ -85,7 +85,7 @@ extension RTMPMuxer: VideoCodecDelegate {
         }
         var buffer: Data
         let frameType = sampleBuffer.isSync ? FLVFrameType.key.rawValue : FLVFrameType.inter.rawValue
-        switch codec.settings.format {
+        switch codec.settings.value.format {
         case .h264:
             buffer = Data([
                 (frameType << 4) | FLVVideoCodec.avc.rawValue,

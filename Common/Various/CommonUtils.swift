@@ -9,6 +9,8 @@ let buttonSize: CGFloat = 40
 let maximumNumberOfWatchChatMessages = 50
 let personalHotspotLocalAddress = "172.20.10.1"
 let backgroundColor = Color(white: 0, opacity: 0.4)
+let scoreboardBlueColor = RgbColor(red: 0x0B, green: 0x10, blue: 0xAC).color()
+let scoreboardDarkBlueColor = RgbColor(red: 0, green: 3, blue: 0x5B).color()
 
 extension String: @retroactive Error {}
 
@@ -672,4 +674,46 @@ class RgbColor: Codable, Equatable {
             return nil
         }
     }
+}
+
+extension RgbColor {
+    private func colorScale(_ color: Int) -> Double {
+        return Double(color) / 255
+    }
+
+    func color() -> Color {
+        return Color(
+            red: colorScale(red),
+            green: colorScale(green),
+            blue: colorScale(blue),
+            opacity: opacity ?? 1.0
+        )
+    }
+}
+
+extension Color {
+    func toRgb() -> RgbColor? {
+        guard let components = UIColor(self).cgColor.components else {
+            return nil
+        }
+        guard components.count >= 3 else {
+            return nil
+        }
+        return RgbColor(
+            red: Int(255 * components[0]),
+            green: Int(255 * components[1]),
+            blue: Int(255 * components[2]),
+            opacity: components.count == 4 ? components[3] : 1.0
+        )
+    }
+}
+
+func isSetWin(first: Int, second: Int) -> Bool {
+    if first == 7 {
+        return true
+    }
+    if first == 6 && second <= 4 {
+        return true
+    }
+    return false
 }

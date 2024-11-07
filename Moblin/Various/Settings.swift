@@ -31,6 +31,7 @@ let codecs = SettingsStreamCodec.allCases.map { $0.rawValue }
 
 enum SettingsStreamResolution: String, Codable, CaseIterable {
     case r3840x2160 = "3840x2160"
+    case r2560x1440 = "2560x1440"
     case r1920x1080 = "1920x1080"
     case r1280x720 = "1280x720"
     case r854x480 = "854x480"
@@ -46,6 +47,8 @@ enum SettingsStreamResolution: String, Codable, CaseIterable {
         switch self {
         case .r3840x2160:
             return "4K"
+        case .r2560x1440:
+            return "1440p"
         case .r1920x1080:
             return "1080p"
         case .r1280x720:
@@ -401,6 +404,8 @@ class SettingsStream: Codable, Identifiable, Equatable {
     var bitrate: UInt32 = 5_000_000
     var codec: SettingsStreamCodec = .h265hevc
     var bFrames: Bool? = false
+    var adaptiveEncoderResolution: Bool? = false
+    var adaptiveEncoderFps: Bool? = false
     var adaptiveBitrate: Bool? = true
     var srt: SettingsStreamSrt = .init()
     var rtmp: SettingsStreamRtmp? = .init()
@@ -948,6 +953,10 @@ class SettingsWidgetAlertsAlert: Codable {
     var positionType: SettingsWidgetAlertPositionType? = .scene
     var facePosition: SettingsWidgetAlertFacePosition? = .init()
 
+    func isTextToSpeechEnabled() -> Bool {
+        return enabled && textToSpeechEnabled!
+    }
+
     func clone() -> SettingsWidgetAlertsAlert {
         let new = SettingsWidgetAlertsAlert()
         new.enabled = enabled
@@ -968,11 +977,49 @@ class SettingsWidgetAlertsAlert: Codable {
     }
 }
 
+enum SettingsWidgetAlertsCheerBitsAlertOperator: String, Codable, CaseIterable {
+    case equal = "="
+    case greaterEqual = ">="
+
+    public init(from decoder: Decoder) throws {
+        self = try SettingsWidgetAlertsCheerBitsAlertOperator(rawValue: decoder.singleValueContainer()
+            .decode(RawValue.self)) ??
+            .equal
+    }
+}
+
+class SettingsWidgetAlertsCheerBitsAlert: Codable, Identifiable {
+    var id: UUID = .init()
+    var bits: Int = 1
+    var comparisonOperator: SettingsWidgetAlertsCheerBitsAlertOperator = .greaterEqual
+    var alert: SettingsWidgetAlertsAlert = .init()
+
+    func clone() -> SettingsWidgetAlertsCheerBitsAlert {
+        let new = SettingsWidgetAlertsCheerBitsAlert()
+        new.bits = bits
+        new.comparisonOperator = comparisonOperator
+        new.alert = alert
+        return new
+    }
+}
+
+private func createDefaultCheerBits() -> [SettingsWidgetAlertsCheerBitsAlert] {
+    var cheerBits: [SettingsWidgetAlertsCheerBitsAlert] = []
+    for (index, bits) in [1].enumerated() {
+        let cheer = SettingsWidgetAlertsCheerBitsAlert()
+        cheer.bits = bits
+        cheer.alert.enabled = index == 0
+        cheerBits.append(cheer)
+    }
+    return cheerBits
+}
+
 class SettingsWidgetAlertsTwitch: Codable {
     var follows: SettingsWidgetAlertsAlert = .init()
     var subscriptions: SettingsWidgetAlertsAlert = .init()
     var raids: SettingsWidgetAlertsAlert? = .init()
     var cheers: SettingsWidgetAlertsAlert? = .init()
+    var cheerBits: [SettingsWidgetAlertsCheerBitsAlert]? = createDefaultCheerBits()
 
     func clone() -> SettingsWidgetAlertsTwitch {
         let new = SettingsWidgetAlertsTwitch()
@@ -980,6 +1027,7 @@ class SettingsWidgetAlertsTwitch: Codable {
         new.subscriptions = subscriptions.clone()
         new.raids = raids!.clone()
         new.cheers = cheers!.clone()
+        new.cheerBits = cheerBits!.map { $0.clone() }
         return new
     }
 }
@@ -1117,6 +1165,91 @@ class SettingsWidgetVideoSource: Codable {
     }
 }
 
+enum SettingsWidgetScoreboardType: String, Codable, CaseIterable {
+    case padel = "Padel"
+
+    public init(from decoder: Decoder) throws {
+        self = try SettingsWidgetScoreboardType(rawValue: decoder.singleValueContainer()
+            .decode(RawValue.self)) ??
+            .padel
+    }
+
+    static func fromString(value: String) -> SettingsWidgetScoreboardType {
+        switch value {
+        case String(localized: "Padel"):
+            return .padel
+        default:
+            return .padel
+        }
+    }
+
+    func toString() -> String {
+        switch self {
+        case .padel:
+            return String(localized: "Padel")
+        }
+    }
+}
+
+let scoreboardTypes = SettingsWidgetScoreboardType.allCases.map { $0.toString() }
+
+class SettingsWidgetScoreboardPlayer: Codable, Identifiable {
+    var id: UUID = .init()
+    var name: String = "🇸🇪 Moblin"
+}
+
+class SettingsWidgetScoreboardScore: Codable, Identifiable {
+    var home: Int = 0
+    var away: Int = 0
+}
+
+enum SettingsWidgetPadelScoreboardGameType: String, Codable, CaseIterable {
+    case doubles = "Double"
+    case singles = "Single"
+
+    public init(from decoder: Decoder) throws {
+        self = try SettingsWidgetPadelScoreboardGameType(rawValue: decoder.singleValueContainer()
+            .decode(RawValue.self)) ??
+            .doubles
+    }
+
+    static func fromString(value: String) -> SettingsWidgetPadelScoreboardGameType {
+        switch value {
+        case String(localized: "Doubles"):
+            return .doubles
+        case String(localized: "Singles"):
+            return .singles
+        default:
+            return .doubles
+        }
+    }
+
+    func toString() -> String {
+        switch self {
+        case .doubles:
+            return String(localized: "Doubles")
+        case .singles:
+            return String(localized: "Singles")
+        }
+    }
+}
+
+let scoreboardGameTypes = SettingsWidgetPadelScoreboardGameType.allCases.map { $0.toString() }
+
+class SettingsWidgetPadelScoreboard: Codable {
+    var type: SettingsWidgetPadelScoreboardGameType = .doubles
+    var homePlayer1: UUID = .init()
+    var homePlayer2: UUID = .init()
+    var awayPlayer1: UUID = .init()
+    var awayPlayer2: UUID = .init()
+    var score: [SettingsWidgetScoreboardScore] = [.init()]
+}
+
+class SettingsWidgetScoreboard: Codable {
+    var type: SettingsWidgetScoreboardType = .padel
+    var padel: SettingsWidgetPadelScoreboard = .init()
+}
+
 enum SettingsWidgetVideoEffectType: String, Codable, CaseIterable {
     case movie = "Movie"
     case grayScale = "Gray scale"
@@ -1151,6 +1284,7 @@ enum SettingsWidgetType: String, Codable, CaseIterable {
     case qrCode = "QR code"
     case alerts = "Alerts"
     case videoSource = "Video source"
+    case scoreboard = "Scoreboard"
 
     public init(from decoder: Decoder) throws {
         self = try SettingsWidgetType(rawValue: decoder.singleValueContainer().decode(RawValue.self)) ??
@@ -1179,6 +1313,8 @@ enum SettingsWidgetType: String, Codable, CaseIterable {
             return .alerts
         case String(localized: "Video source"):
             return .videoSource
+        case String(localized: "Scoreboard"):
+            return .scoreboard
         default:
             return .videoEffect
         }
@@ -1206,6 +1342,8 @@ enum SettingsWidgetType: String, Codable, CaseIterable {
             return String(localized: "Alerts")
         case .videoSource:
             return String(localized: "Video source")
+        case .scoreboard:
+            return String(localized: "Scoreboard")
         }
     }
 }
@@ -1236,6 +1374,7 @@ class SettingsWidget: Codable, Identifiable, Equatable {
     var qrCode: SettingsWidgetQrCode? = .init()
     var alerts: SettingsWidgetAlerts? = .init()
     var videoSource: SettingsWidgetVideoSource? = .init()
+    var scoreboard: SettingsWidgetScoreboard? = .init()
     var enabled: Bool? = true
 
     init(name: String) {
@@ -1325,6 +1464,8 @@ enum SettingsButtonType: String, Codable, CaseIterable {
     case luts = "LUTs"
     case workout = "Workout"
     case ads = "Ads"
+    case skipCurrentTts = "Skip current TTS"
+    case streamMarker = "Stream marker"
 
     public init(from decoder: Decoder) throws {
         var value = try decoder.singleValueContainer().decode(RawValue.self)
@@ -1692,6 +1833,8 @@ class SettingsDebug: Codable {
     var preferStereoMic: Bool? = false
     var maxMapPitch: Double? = 0.0
     var twitchRewards: Bool? = false
+    var removeWindNoise: Bool? = false
+    var lowAdaptiveEncoderResolution: Bool? = false
 }
 
 let rtmpServerFpss = ["60.0", "59.94", "50.0", "30.0", "29.97", "25.0"]
@@ -2322,6 +2465,8 @@ private let allBundledAlertsMediaGallerySounds = [
     SettingsAlertsMediaGalleryItem(name: "Coin dropping"),
     SettingsAlertsMediaGalleryItem(name: "Fart"),
     SettingsAlertsMediaGalleryItem(name: "Fart 2"),
+    SettingsAlertsMediaGalleryItem(name: "Bad chili fart"),
+    SettingsAlertsMediaGalleryItem(name: "Perfect fart"),
     SettingsAlertsMediaGalleryItem(name: "Silence"),
 ]
 
@@ -2375,6 +2520,7 @@ class Database: Codable {
     var alertsMediaGallery: SettingsAlertsMediaGallery? = .init()
     var catPrinters: SettingsCatPrinters? = .init()
     var verboseStatuses: Bool? = false
+    var scoreboardPlayers: [SettingsWidgetScoreboardPlayer]? = .init()
 
     static func fromString(settings: String) throws -> Database {
         let database = try JSONDecoder().decode(
@@ -2723,12 +2869,28 @@ private func addMissingGlobalButtons(database: Database) {
     button.systemImageNameOff = "figure.run"
     updateGlobalButton(database: database, button: button)
 
+    button = SettingsButton(name: String(localized: "Skip current TTS"))
+    button.id = UUID()
+    button.type = .skipCurrentTts
+    button.imageType = "System name"
+    button.systemImageNameOn = "waveform.slash"
+    button.systemImageNameOff = "waveform.slash"
+    updateGlobalButton(database: database, button: button)
+
     button = SettingsButton(name: String(localized: "Ads"))
     button.id = UUID()
     button.type = .ads
     button.imageType = "System name"
     button.systemImageNameOn = "cup.and.saucer"
     button.systemImageNameOff = "cup.and.saucer"
+    updateGlobalButton(database: database, button: button)
+
+    button = SettingsButton(name: String(localized: "Stream marker"))
+    button.id = UUID()
+    button.type = .streamMarker
+    button.imageType = "System name"
+    button.systemImageNameOn = "bookmark"
+    button.systemImageNameOff = "bookmark"
     updateGlobalButton(database: database, button: button)
 
     database.globalButtons = database.globalButtons!.filter { button in
@@ -3864,6 +4026,9 @@ final class Settings {
                         case .r3840x2160:
                             width = 3840
                             height = 2160
+                        case .r2560x1440:
+                            width = 2560
+                            height = 1440
                         case .r1920x1080:
                             width = 1920
                             height = 1080
@@ -4113,6 +4278,35 @@ final class Settings {
         }
         for widget in realDatabase.widgets where widget.videoSource!.rotation == nil {
             widget.videoSource!.rotation = 0.0
+            store()
+        }
+        if realDatabase.debug!.removeWindNoise == nil {
+            realDatabase.debug!.removeWindNoise = false
+            store()
+        }
+        for widget in realDatabase.widgets where widget.scoreboard == nil {
+            widget.scoreboard = .init()
+            store()
+        }
+        if realDatabase.scoreboardPlayers == nil {
+            realDatabase.scoreboardPlayers = .init()
+            store()
+        }
+        for widget in database.widgets where widget.alerts!.twitch!.cheerBits == nil {
+            widget.alerts!.twitch!.cheerBits = createDefaultCheerBits()
+            widget.alerts!.twitch!.cheerBits![0].alert = widget.alerts!.twitch!.cheers!.clone()
+            store()
+        }
+        for stream in database.streams where stream.adaptiveEncoderResolution == nil {
+            stream.adaptiveEncoderResolution = false
+            store()
+        }
+        for stream in database.streams where stream.adaptiveEncoderFps == nil {
+            stream.adaptiveEncoderFps = false
+            store()
+        }
+        if realDatabase.debug!.lowAdaptiveEncoderResolution == nil {
+            realDatabase.debug!.lowAdaptiveEncoderResolution = false
             store()
         }
     }

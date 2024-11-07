@@ -28,7 +28,7 @@ struct VideoCodecSettings {
         }
     }
 
-    var videoSize: VideoSize
+    var videoSize: CMVideoDimensions
     var bitRate: UInt32
     var maxKeyFrameIntervalDuration: Int32
     var allowFrameReordering: Bool
@@ -41,6 +41,9 @@ struct VideoCodecSettings {
             }
         }
     }
+
+    var adaptiveResolution = false
+    var adaptiveFps = false
 
     private(set) var format: Format = .h264
 

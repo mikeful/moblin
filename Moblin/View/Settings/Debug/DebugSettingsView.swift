@@ -28,12 +28,7 @@ struct DebugSettingsView: View {
                 Toggle(isOn: Binding(get: {
                     model.database.debug!.logLevel == .debug
                 }, set: { value in
-                    logger.debugEnabled = value
-                    if value {
-                        model.database.debug!.logLevel = .debug
-                    } else {
-                        model.database.debug!.logLevel = .error
-                    }
+                    model.setDebugLogging(on: value)
                 })) {
                     Text("Debug logging")
                 }
@@ -131,6 +126,12 @@ struct DebugSettingsView: View {
                     model.database.debug!.twitchRewards!
                 }, set: { value in
                     model.database.debug!.twitchRewards = value
+                }))
+                Toggle("Low adaptive encoder resolution", isOn: Binding(get: {
+                    model.database.debug!.lowAdaptiveEncoderResolution!
+                }, set: { value in
+                    model.database.debug!.lowAdaptiveEncoderResolution = value
+                    model.setLowAdaptiveEncoderResolution()
                 }))
             } header: {
                 Text("Experimental")

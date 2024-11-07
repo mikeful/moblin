@@ -59,6 +59,8 @@ func widgetImage(widget: SettingsWidget) -> String {
         return "megaphone"
     case .videoSource:
         return "video"
+    case .scoreboard:
+        return "rectangle.split.2x1"
     }
 }
 
@@ -103,38 +105,6 @@ func randomGoodPassword() -> String {
         if isGoodPassword(password: password) {
             return password
         }
-    }
-}
-
-extension RgbColor {
-    private func colorScale(_ color: Int) -> Double {
-        return Double(color) / 255
-    }
-
-    func color() -> Color {
-        return Color(
-            red: colorScale(red),
-            green: colorScale(green),
-            blue: colorScale(blue),
-            opacity: opacity ?? 1.0
-        )
-    }
-}
-
-extension Color {
-    func toRgb() -> RgbColor? {
-        guard let components = UIColor(self).cgColor.components else {
-            return nil
-        }
-        guard components.count >= 3 else {
-            return nil
-        }
-        return RgbColor(
-            red: Int(255 * components[0]),
-            green: Int(255 * components[1]),
-            blue: Int(255 * components[2]),
-            opacity: components.count == 4 ? components[3] : 1.0
-        )
     }
 }
 

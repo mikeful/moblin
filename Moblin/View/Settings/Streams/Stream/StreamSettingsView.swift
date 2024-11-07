@@ -30,7 +30,11 @@ struct StreamSettingsView: View {
                 }
                 .disabled(stream.enabled && model.isLive)
                 NavigationLink {
-                    StreamVideoSettingsView(stream: stream)
+                    StreamVideoSettingsView(
+                        stream: stream,
+                        codec: stream.codec.rawValue,
+                        bitrate: stream.bitrate
+                    )
                 } label: {
                     Text("Video")
                 }
@@ -44,7 +48,10 @@ struct StreamSettingsView: View {
                         Text("Audio")
                     }
                     NavigationLink {
-                        StreamRecordingSettingsView(stream: stream)
+                        StreamRecordingSettingsView(
+                            stream: stream,
+                            videoCodec: stream.recording!.videoCodec.rawValue
+                        )
                     } label: {
                         Text("Recording")
                     }

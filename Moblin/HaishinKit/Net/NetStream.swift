@@ -15,7 +15,8 @@ protocol NetStreamDelegate: AnyObject {
     func streamVideo(_ stream: NetStream, failedEffect: String?)
     func streamVideo(_ stream: NetStream, lowFpsImage: Data?, frameNumber: UInt64)
     func streamVideo(_ stream: NetStream, findVideoFormatError: String, activeFormat: String)
-    func stream(_ stream: NetStream, recorderFinishWriting writer: AVAssetWriter)
+    func streamRecorderFinished()
+    func streamRecorderError()
     func streamAudio(_ stream: NetStream, sampleBuffer: CMSampleBuffer)
     func streamNoTorch()
 }
@@ -50,9 +51,10 @@ open class NetStream: NSObject {
         }
     }
 
-    func setSessionPreset(preset: AVCaptureSession.Preset) {
+    func setVideoSize(capture: CGSize, output: CGSize) {
         netStreamLockQueue.async {
-            self.mixer.video.preset = preset
+            self.mixer.video.captureSize = capture
+            self.mixer.video.outputSize = output
         }
     }
 
@@ -75,12 +77,12 @@ open class NetStream: NSObject {
         }
     }
 
-    var videoSettings: VideoCodecSettings {
+    var videoEncodecSettings: VideoCodecSettings {
         get {
-            mixer.video.encoder.settings
+            mixer.video.encoder.settings.value
         }
         set {
-            mixer.video.encoder.settings = newValue
+            mixer.video.encoder.settings.mutate { $0 = newValue }
         }
     }
 
@@ -223,8 +225,12 @@ extension NetStream: MixerDelegate {
         delegate?.streamVideo(self, findVideoFormatError: findVideoFormatError, activeFormat: activeFormat)
     }
 
-    func mixer(recorderFinishWriting writer: AVAssetWriter) {
-        delegate?.stream(self, recorderFinishWriting: writer)
+    func mixerRecorderFinished() {
+        delegate?.streamRecorderFinished()
+    }
+
+    func mixerRecorderError() {
+        delegate?.streamRecorderError()
     }
 
     func mixer(audioSampleBuffer: CMSampleBuffer) {

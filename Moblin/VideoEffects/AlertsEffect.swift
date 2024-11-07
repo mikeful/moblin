@@ -233,7 +233,7 @@ final class AlertsEffect: VideoEffect {
         (image, imageLoopCount, sound) = getMediaItems(alert: twitch.raids!)
         twitchRaid.updateImages(image: image, loopCount: imageLoopCount)
         twitchRaid.updateSoundUrl(sound: sound)
-        (image, imageLoopCount, sound) = getMediaItems(alert: twitch.cheers!)
+        (image, imageLoopCount, sound) = getMediaItems(alert: twitch.cheerBits![0].alert)
         twitchCheers.updateImages(image: image, loopCount: imageLoopCount)
         twitchCheers.updateSoundUrl(sound: sound)
         chatBotCommands = []
@@ -246,6 +246,10 @@ final class AlertsEffect: VideoEffect {
             chatBotCommands.append(medias)
         }
         self.settings = settings
+    }
+
+    func getSettings() -> SettingsWidgetAlerts {
+        return settings
     }
 
     func setPosition(x: Double, y: Double) {
@@ -363,15 +367,19 @@ final class AlertsEffect: VideoEffect {
 
     @MainActor
     private func playTwitchCheer(event: TwitchEventSubChannelCheerEvent) {
-        guard settings.twitch!.cheers!.enabled else {
-            return
+        for cheerBit in settings.twitch!.cheerBits! where cheerBit.alert.enabled {
+            guard event.bits >= cheerBit.bits else {
+                continue
+            }
+            let bits = countFormatter.format(event.bits)
+            play(
+                medias: twitchCheers,
+                username: event.user_name ?? "Anonymous",
+                message: String(localized: "cheered \(bits) bits! \(event.message)"),
+                settings: cheerBit.alert
+            )
+            break
         }
-        play(
-            medias: twitchCheers,
-            username: event.user_name ?? "Anonymous",
-            message: String(localized: "cheered \(event.bits) bits! \(event.message)"),
-            settings: settings.twitch!.cheers!
-        )
     }
 
     @MainActor
@@ -448,7 +456,8 @@ final class AlertsEffect: VideoEffect {
     }
 
     @MainActor
-    private func renderMessage(username: String, message: String,
+    private func renderMessage(username: String,
+                               message: String,
                                settings: SettingsWidgetAlertsAlert) -> CIImage?
     {
         let words = message.split(separator: " ").map { Word(text: String($0)) }

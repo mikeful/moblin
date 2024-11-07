@@ -22,6 +22,9 @@ import WatchConnectivity
 import WebKit
 import WrappingHStack
 
+private let noBackZoomPresetId = UUID()
+private let noFrontZoomPresetId = UUID()
+
 private struct ChatBotMessage {
     let platform: Platform
     let user: String?
@@ -181,7 +184,6 @@ struct ChatHighlight {
     let color: Color
     let image: String
     let title: String
-    let skipTextToSpeech: Bool
 
     func toWatchProtocol() -> WatchProtocolChatHighlight {
         let watchProtocolKind: WatchProtocolChatHighlightKind
@@ -223,6 +225,7 @@ struct ChatPost: Identifiable, Equatable {
     var timestampTime: ContinuousClock.Instant
     var isAction: Bool
     var isSubscriber: Bool
+    var bits: String?
     var highlight: ChatHighlight?
 }
 
@@ -417,6 +420,7 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
     private var enabledAlertsEffects: [AlertsEffect] = []
     private var drawOnStreamEffect = DrawOnStreamEffect()
     private var lutEffect = LutEffect()
+    private var padelScoreboardEffects: [UUID: PadelScoreboardEffect] = [:]
     @Published var browsers: [Browser] = []
     @Published var sceneIndex = 0
     @Published var isTorchOn = false
@@ -573,6 +577,7 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
     @Published var remoteControlMic = ""
     @Published var remoteControlBitrate = UUID()
     @Published var remoteControlZoom = ""
+    @Published var remoteControlDebugLogging = false
 
     private var remoteControlStreamer: RemoteControlStreamer?
     private var remoteControlAssistant: RemoteControlAssistant?
@@ -644,6 +649,38 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         database.scenes.filter { scene in scene.enabled }
     }
 
+    var widgetsInCurrentScene: [SettingsWidget] {
+        guard let scene = getSelectedScene() else {
+            return []
+        }
+        var found: [UUID] = []
+        return getSceneWidgets(scene: scene).filter {
+            if found.contains($0.id) {
+                return false
+            } else {
+                found.append($0.id)
+                return true
+            }
+        }
+    }
+
+    private func getSceneWidgets(scene: SettingsScene) -> [SettingsWidget] {
+        var widgets: [SettingsWidget] = []
+        for sceneWidget in scene.widgets {
+            guard let widget = findWidget(id: sceneWidget.widgetId) else {
+                continue
+            }
+            widgets.append(widget)
+            guard widget.type == .scene else {
+                continue
+            }
+            if let scene = database.scenes.first(where: { $0.id == widget.scene!.sceneId }) {
+                widgets += getSceneWidgets(scene: scene)
+            }
+        }
+        return widgets
+    }
+
     @Published var myIcons: [Icon] = []
     @Published var iconsInStore: [Icon] = []
     private var appStoreUpdateListenerTask: Task<Void, Error>?
@@ -673,7 +710,14 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
 
     private var healthStore = HKHealthStore()
 
-    func updateAdaptiveBitrateSrtIfEnabled(stream: SettingsStream) {
+    func setAdaptiveBitrateSrtAlgorithm(stream: SettingsStream) {
+        media.srtSetAdaptiveBitrateAlgorithm(
+            targetBitrate: stream.bitrate,
+            adaptiveBitrateAlgorithm: stream.srt.adaptiveBitrate!.algorithm
+        )
+    }
+
+    func updateAdaptiveBitrateSrt(stream: SettingsStream) {
         switch stream.srt.adaptiveBitrate!.algorithm {
         case .fastIrl:
             var settings = adaptiveBitrateFastSettings
@@ -750,6 +794,17 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
             setGlobalButtonState(type: type, isOn: showingPanel == panel)
         }
         updateButtonStates()
+    }
+
+    func createStreamMarker() {
+        TwitchApi(accessToken: stream.twitchAccessToken!)
+            .createStreamMarker(userId: stream.twitchChannelId) { data in
+                if data != nil {
+                    self.makeToast(title: String(localized: "Stream marker created"))
+                } else {
+                    self.makeErrorToast(title: String(localized: "Failed to create stream marker"))
+                }
+            }
     }
 
     @MainActor
@@ -857,6 +912,10 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         default:
             logger.warning("cosmetics: What happend when buying? \(result)")
         }
+    }
+
+    func setLowAdaptiveEncoderResolution() {
+        videoCodecLowAdaptiveEncoderResolution = database.debug!.lowAdaptiveEncoderResolution!
     }
 
     func setAllowVideoRangePixelFormat() {
@@ -1118,6 +1177,8 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         setMapPitch()
         setAllowVideoRangePixelFormat()
         setBlurSceneSwitch()
+        setLowAdaptiveEncoderResolution()
+        audioUnitRemoveWindNoise = database.debug!.removeWindNoise!
         showFirstTimeChatterMessage = database.chat.showFirstTimeChatterMessage!
         showNewFollowerMessage = database.chat.showNewFollowerMessage!
         verboseStatuses = database.verboseStatuses!
@@ -1140,6 +1201,8 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         media.onAudioBuffer = handleAudioBuffer
         media.onLowFpsImage = handleLowFpsImage
         media.onFindVideoFormatError = handleFindVideoFormatError
+        media.onRecorderFinished = handleRecorderFinished
+        media.onRecorderError = handleRecorderError
         media.onNoTorch = handleNoTorch
         setPixelFormat()
         setMetalPetalFilters()
@@ -1600,7 +1663,7 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
             return
         }
         if !shouldStreamInBackground() {
-            reloadStream()
+            reloadStream(continueRecording: isRecording)
             sceneUpdated()
             setupAudioSession()
             media.attachAudio(device: AVCaptureDevice.default(for: .audio))
@@ -1927,7 +1990,7 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
                 if let fps = video.fps, fpss.contains(String(fps)) {
                     newStream.fps = fps
                 }
-                if let bitrate = video.bitrate, bitrate >= 100_000, bitrate <= 50_000_000 {
+                if let bitrate = video.bitrate, bitrate >= 50000, bitrate <= 50_000_000 {
                     newStream.bitrate = bitrate
                 }
                 if let codec = video.codec {
@@ -2369,6 +2432,7 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         }
         if newValue != numberOfViewers {
             numberOfViewers = newValue
+            sendViewerCountWatch()
         }
     }
 
@@ -2460,6 +2524,7 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
             isAction: false,
             isSubscriber: false,
             isModerator: false,
+            bits: nil,
             highlight: nil
         )
     }
@@ -2618,10 +2683,43 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
                 return false
             }
         }
-        if post.highlight?.skipTextToSpeech == true {
+        if post.bits != nil {
+            return false
+        }
+        if isAlertMessage(post: post) && isTextToSpeechEnabledForAnyAlertWidget() {
             return false
         }
         return true
+    }
+
+    private func isAlertMessage(post: ChatPost) -> Bool {
+        switch post.highlight?.kind {
+        case .redemption:
+            return true
+        case .newFollower:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func isTextToSpeechEnabledForAnyAlertWidget() -> Bool {
+        for alertEffect in enabledAlertsEffects {
+            let settings = alertEffect.getSettings()
+            if settings.twitch!.follows.isTextToSpeechEnabled() {
+                return true
+            }
+            if settings.twitch!.subscriptions.isTextToSpeechEnabled() {
+                return true
+            }
+            if settings.twitch!.raids!.isTextToSpeechEnabled() {
+                return true
+            }
+            if settings.twitch!.cheers!.isTextToSpeechEnabled() {
+                return true
+            }
+        }
+        return false
     }
 
     private func setTextToSpeechStreamerMentions() {
@@ -2816,9 +2914,14 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         }
         let location = locationManager.getLatestKnownLocation()
         if let latestKnownLocation {
-            distance += location?.distance(from: latestKnownLocation) ?? 0
+            let distance = location?.distance(from: latestKnownLocation) ?? 0
+            if distance > latestKnownLocation.horizontalAccuracy {
+                self.distance += distance
+                self.latestKnownLocation = location
+            }
+        } else {
+            latestKnownLocation = location
         }
-        latestKnownLocation = location
         let weather = weatherManager.getLatestWeather()
         let placemark = geographyManager.getLatestPlacemark()
         let stats = TextEffectStats(
@@ -2978,6 +3081,13 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         for widget in database.widgets where widget.type == .videoSource {
             videoSourceEffects[widget.id] = VideoSourceEffect()
         }
+        for padelScoreboardEffect in padelScoreboardEffects.values {
+            media.unregisterEffect(padelScoreboardEffect)
+        }
+        padelScoreboardEffects.removeAll()
+        for widget in database.widgets where widget.type == .scoreboard {
+            padelScoreboardEffects[widget.id] = PadelScoreboardEffect()
+        }
         for alertsEffect in alertsEffects.values {
             media.unregisterEffect(alertsEffect)
         }
@@ -3090,12 +3200,14 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         makeToast(title: String(localized: "Recording started"), subTitle: subTitle)
     }
 
-    func stopRecording() {
+    func stopRecording(showToast: Bool = true) {
         guard isRecording else {
             return
         }
         setIsRecording(value: false)
-        makeToast(title: String(localized: "Recording stopped"))
+        if showToast {
+            makeToast(title: String(localized: "Recording stopped"))
+        }
         suspendRecording()
     }
 
@@ -3209,6 +3321,7 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         if !isRemoteControlAssistantConnected() {
             sendIsLiveToWatch(isLive: isLive)
         }
+        remoteControlStreamer?.stateChanged(state: RemoteControlState(streaming: isLive))
     }
 
     func setIsRecording(value: Bool) {
@@ -3218,6 +3331,7 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         if !isRemoteControlAssistantConnected() {
             sendIsRecordingToWatch(isRecording: isRecording)
         }
+        remoteControlStreamer?.stateChanged(state: RemoteControlState(recording: isRecording))
     }
 
     func setIsWorkout(type: WatchProtocolWorkoutType?) {
@@ -3332,7 +3446,7 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
                 networkInterfaceNames: database.networkInterfaceNames!,
                 connectionPriorities: stream.srt.connectionPriorities!
             )
-            updateAdaptiveBitrateSrtIfEnabled(stream: stream)
+            updateAdaptiveBitrateSrt(stream: stream)
         case .irltk:
             payloadSize = stream.srt.mpegtsPacketsPerPacket * MpegTsPacket.size
             media.irlToolkitStartStream(
@@ -3348,7 +3462,7 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
                 networkInterfaceNames: database.networkInterfaceNames!,
                 connectionPriorities: stream.srt.connectionPriorities!
             )
-            updateAdaptiveBitrateSrtIfEnabled(stream: stream)
+            updateAdaptiveBitrateSrt(stream: stream)
         case .rist:
             media.ristStartStream(url: stream.url,
                                   bonding: stream.rist!.bonding,
@@ -3400,15 +3514,19 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         }
     }
 
-    func reloadStream() {
+    func reloadStream(continueRecording: Bool = false) {
         cameraPosition = nil
-        stopRecording()
+        if !continueRecording {
+            stopRecording()
+        }
         stopStream()
         setNetStream()
         setStreamResolution()
         setStreamFPS()
         setColorSpace()
         setStreamCodec()
+        setStreamAdaptiveResolution()
+        setStreamAdaptiveFps()
         setStreamKeyFrameInterval()
         setStreamBitrate(stream: stream)
         setAudioStreamBitrate(stream: stream)
@@ -3470,30 +3588,44 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         return database.zoom.front.filter { showPreset(preset: $0) }
     }
 
-    private func getPreset(preset: AVCaptureSession.Preset) -> AVCaptureSession.Preset {
-        return preset
-    }
-
     private func setStreamResolution() {
         switch stream.resolution {
         case .r3840x2160:
-            media.setVideoSessionPreset(preset: getPreset(preset: .hd4K3840x2160))
-            media.setVideoSize(width: 3840, height: 2160)
+            media.setVideoSize(
+                capture: .init(width: 3840, height: 2160),
+                output: .init(width: 3840, height: 2160)
+            )
+        case .r2560x1440:
+            // Use 4K camera and downscale to 1440p.
+            media.setVideoSize(
+                capture: .init(width: 3840, height: 2160),
+                output: .init(width: 2560, height: 1440)
+            )
         case .r1920x1080:
-            media.setVideoSessionPreset(preset: getPreset(preset: .hd1920x1080))
-            media.setVideoSize(width: 1920, height: 1080)
+            media.setVideoSize(
+                capture: .init(width: 1920, height: 1080),
+                output: .init(width: 1920, height: 1080)
+            )
         case .r1280x720:
-            media.setVideoSessionPreset(preset: getPreset(preset: .hd1280x720))
-            media.setVideoSize(width: 1280, height: 720)
+            media.setVideoSize(
+                capture: .init(width: 1280, height: 720),
+                output: .init(width: 1280, height: 720)
+            )
         case .r854x480:
-            media.setVideoSessionPreset(preset: getPreset(preset: .hd1280x720))
-            media.setVideoSize(width: 854, height: 480)
+            media.setVideoSize(
+                capture: .init(width: 1280, height: 720),
+                output: .init(width: 854, height: 480)
+            )
         case .r640x360:
-            media.setVideoSessionPreset(preset: getPreset(preset: .hd1280x720))
-            media.setVideoSize(width: 640, height: 360)
+            media.setVideoSize(
+                capture: .init(width: 1280, height: 720),
+                output: .init(width: 640, height: 360)
+            )
         case .r426x240:
-            media.setVideoSessionPreset(preset: getPreset(preset: .hd1280x720))
-            media.setVideoSize(width: 426, height: 240)
+            media.setVideoSize(
+                capture: .init(width: 1280, height: 720),
+                output: .init(width: 426, height: 240)
+            )
         }
     }
 
@@ -3543,6 +3675,16 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         remoteControlStreamer?.stateChanged(state: RemoteControlState(bitrate: preset.id))
     }
 
+    func setDebugLogging(on: Bool) {
+        logger.debugEnabled = on
+        if on {
+            database.debug!.logLevel = .debug
+        } else {
+            database.debug!.logLevel = .error
+        }
+        remoteControlStreamer?.stateChanged(state: RemoteControlState(debugLogging: on))
+    }
+
     func setAudioStreamBitrate(stream: SettingsStream) {
         media.setAudioStreamBitrate(bitrate: stream.audioBitrate!)
     }
@@ -3563,6 +3705,14 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
             media.setVideoProfile(profile: kVTProfileLevel_HEVC_Main_AutoLevel)
         }
         media.setAllowFrameReordering(value: stream.bFrames!)
+    }
+
+    private func setStreamAdaptiveResolution() {
+        media.setStreamAdaptiveResolution(value: stream.adaptiveEncoderResolution!)
+    }
+
+    private func setStreamAdaptiveFps() {
+        media.setStreamAdaptiveFps(value: stream.adaptiveEncoderFps!)
     }
 
     private func setStreamKeyFrameInterval() {
@@ -4439,6 +4589,7 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         isAction: Bool,
         isSubscriber: Bool,
         isModerator: Bool,
+        bits: String?,
         highlight: ChatHighlight?
     ) {
         if database.chat.usernamesToIgnore!.contains(where: { user == $0.value }) {
@@ -4467,6 +4618,7 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
             timestampTime: timestampTime,
             isAction: isAction,
             isSubscriber: isSubscriber,
+            bits: bits,
             highlight: highlight
         )
         chatPostId += 1
@@ -4549,6 +4701,9 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         media.unregisterEffect(lutEffect)
         for lutEffect in lutEffects.values {
             media.unregisterEffect(lutEffect)
+        }
+        for padelScoreboardEffect in padelScoreboardEffects.values {
+            media.unregisterEffect(padelScoreboardEffect)
         }
     }
 
@@ -4787,6 +4942,7 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         effects += registerGlobalVideoEffects()
         var usedBrowserEffects: [BrowserEffect] = []
         var usedMapEffects: [MapEffect] = []
+        var usedPadelScoreboardEffects: [PadelScoreboardEffect] = []
         var addedScenes: [SettingsScene] = []
         var needsSpeechToText = false
         enabledAlertsEffects = []
@@ -4795,6 +4951,7 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
             &effects,
             &usedBrowserEffects,
             &usedMapEffects,
+            &usedPadelScoreboardEffects,
             &addedScenes,
             &enabledAlertsEffects,
             &needsSpeechToText
@@ -4809,6 +4966,11 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         }
         for mapEffect in mapEffects.values where !usedMapEffects.contains(mapEffect) {
             mapEffect.setSceneWidget(sceneWidget: nil)
+        }
+        for (id, padelScoreboardEffect) in padelScoreboardEffects
+            where !usedPadelScoreboardEffects.contains(padelScoreboardEffect)
+        {
+            sendRemovePadelScoreboardToWatch(id: id)
         }
         media.setSpeechToText(enabled: needsSpeechToText)
         attachSingleLayout(scene: scene)
@@ -4848,6 +5010,7 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         _ effects: inout [VideoEffect],
         _ usedBrowserEffects: inout [BrowserEffect],
         _ usedMapEffects: inout [MapEffect],
+        _ usedPadelScoreboardEffects: inout [PadelScoreboardEffect],
         _ addedScenes: inout [SettingsScene],
         _ enabledAlertsEffects: inout [AlertsEffect],
         _ needsSpeechToText: inout Bool
@@ -4917,6 +5080,7 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
                         &effects,
                         &usedBrowserEffects,
                         &usedMapEffects,
+                        &usedPadelScoreboardEffects,
                         &addedScenes,
                         &enabledAlertsEffects,
                         &needsSpeechToText
@@ -4944,8 +5108,41 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
                     videoSourceEffect.setSettings(settings: widget.videoSource!.toEffectSettings())
                     effects.append(videoSourceEffect)
                 }
+            case .scoreboard:
+                if let padelScoreboardEffect = padelScoreboardEffects[widget.id] {
+                    padelScoreboardEffect.setSceneWidget(sceneWidget: sceneWidget.clone())
+                    let scoreboard = widget.scoreboard!
+                    padelScoreboardEffect
+                        .update(scoreboard: padelScoreboardSettingsToEffect(scoreboard.padel))
+                    sendUpdatePadelScoreboardToWatch(id: widget.id, scoreboard: scoreboard)
+                    effects.append(padelScoreboardEffect)
+                    usedPadelScoreboardEffects.append(padelScoreboardEffect)
+                }
             }
         }
+    }
+
+    private func padelScoreboardSettingsToEffect(_ scoreboard: SettingsWidgetPadelScoreboard)
+        -> PadelScoreboard
+    {
+        var homePlayers = [createPadelPlayer(id: scoreboard.homePlayer1)]
+        var awayPlayers = [createPadelPlayer(id: scoreboard.awayPlayer1)]
+        if scoreboard.type == .doubles {
+            homePlayers.append(createPadelPlayer(id: scoreboard.homePlayer2))
+            awayPlayers.append(createPadelPlayer(id: scoreboard.awayPlayer2))
+        }
+        let home = PadelScoreboardTeam(players: homePlayers)
+        let away = PadelScoreboardTeam(players: awayPlayers)
+        let score = scoreboard.score.map { PadelScoreboardScore(home: $0.home, away: $0.away) }
+        return PadelScoreboard(home: home, away: away, score: score)
+    }
+
+    private func createPadelPlayer(id: UUID) -> PadelScoreboardPlayer {
+        return PadelScoreboardPlayer(name: findScoreboardPlayer(id: id))
+    }
+
+    func findScoreboardPlayer(id: UUID) -> String {
+        return database.scoreboardPlayers!.first(where: { $0.id == id })?.name ?? "🇸🇪 Moblin"
     }
 
     private func getVideoSourceId(cameraId: SettingsCameraId) -> UUID? {
@@ -5121,7 +5318,7 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
 
     private func updateSpeed(now: ContinuousClock.Instant) {
         if isLive {
-            let speed = media.streamSpeed()
+            let speed = Int64(media.getVideoStreamBitrate(bitrate: stream.bitrate))
             checkLowBitrate(speed: speed, now: now)
             streamingHistoryStream?.updateBitrate(bitrate: speed)
             speedMbpsOneDecimal = String(format: "%.1f", Double(speed) / 1_000_000)
@@ -5526,9 +5723,9 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
     private func clearZoomId() {
         switch cameraPosition {
         case .back:
-            backZoomPresetId = UUID()
+            backZoomPresetId = noBackZoomPresetId
         case .front:
-            frontZoomPresetId = UUID()
+            frontZoomPresetId = noFrontZoomPresetId
         default:
             break
         }
@@ -5574,13 +5771,13 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         guard let image else {
             return
         }
-        DispatchQueue.main.async {
-            if frameNumber % self.lowFpsImageFps == 0 {
-                if !self.isRemoteControlAssistantConnected() {
-                    self.sendPreviewToWatch(image: image)
+        DispatchQueue.main.async { [self] in
+            if frameNumber % lowFpsImageFps == 0 {
+                if !isRemoteControlAssistantConnected() {
+                    sendPreviewToWatch(image: image)
                 }
             }
-            self.sendPreviewToRemoteControlAssistant(preview: image)
+            sendPreviewToRemoteControlAssistant(preview: image)
         }
     }
 
@@ -5590,10 +5787,37 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
         }
     }
 
+    private func handleRecorderFinished() {}
+
+    private var latestRecordingErrorRestart: ContinuousClock.Instant = .now
+
+    private func handleRecorderError() {
+        DispatchQueue.main.async { [self] in
+            guard isRecording else {
+                return
+            }
+            if self.latestRecordingErrorRestart.duration(to: .now) > .seconds(60) {
+                makeErrorToast(
+                    title: String(localized: "Recording error"),
+                    subTitle: String(localized: "Starting a new recording")
+                )
+                suspendRecording()
+                startRecording()
+            } else {
+                stopRecording(showToast: false)
+                makeErrorToast(
+                    title: String(localized: "Recording error"),
+                    subTitle: String(localized: "Recording stopped")
+                )
+            }
+            self.latestRecordingErrorRestart = .now
+        }
+    }
+
     private func handleNoTorch() {
-        DispatchQueue.main.async {
-            if !self.isFrontCameraSelected {
-                self.makeErrorToast(
+        DispatchQueue.main.async { [self] in
+            if !isFrontCameraSelected {
+                makeErrorToast(
                     title: String(localized: "Torch unavailable in this scene."),
                     subTitle: String(localized: "Normally only available for built-in cameras.")
                 )
@@ -5941,6 +6165,7 @@ extension Model: RemoteControlStreamerDelegate {
             state.bitrate = preset.id
         }
         state.zoom = zoomX
+        state.debugLogging = database.debug!.logLevel == .debug
         remoteControlStreamer?.stateChanged(state: state)
     }
 
@@ -6119,6 +6344,11 @@ extension Model: RemoteControlStreamerDelegate {
             stopStream()
         }
         updateButtonStates()
+        onComplete()
+    }
+
+    func remoteControlStreamerSetDebugLogging(on: Bool, onComplete: @escaping () -> Void) {
+        setDebugLogging(on: on)
         onComplete()
     }
 
@@ -6376,6 +6606,10 @@ extension Model {
         remoteControlAssistant?.setBitratePreset(id: id) {}
     }
 
+    func remoteControlAssistantSetDebugLogging(on: Bool) {
+        remoteControlAssistant?.setDebugLogging(on: on) {}
+    }
+
     func remoteControlAssistantReloadBrowserWidgets() {
         remoteControlAssistant?.reloadBrowserWidgets {
             DispatchQueue.main.async {
@@ -6437,6 +6671,16 @@ extension Model: RemoteControlAssistantDelegate {
         if let zoom = state.zoom {
             remoteControlState.zoom = zoom
             remoteControlZoom = String(zoom)
+        }
+        if let debugLogging = state.debugLogging {
+            remoteControlState.debugLogging = debugLogging
+            remoteControlDebugLogging = debugLogging
+        }
+        if let streaming = state.streaming {
+            remoteControlState.streaming = streaming
+        }
+        if let recording = state.recording {
+            remoteControlState.recording = recording
         }
     }
 
@@ -6527,6 +6771,61 @@ extension Model {
         } else {
             sendStopWorkoutToWatch()
         }
+    }
+
+    private func sendViewerCountWatch() {
+        guard isWatchReachable() else {
+            return
+        }
+        sendMessageToWatch(type: .viewerCount, data: numberOfViewers)
+    }
+
+    private func sendUpdatePadelScoreboardToWatch(id: UUID, scoreboard: SettingsWidgetScoreboard) {
+        guard isWatchReachable() else {
+            return
+        }
+        var data: Data
+        do {
+            var home = [scoreboard.padel.homePlayer1]
+            var away = [scoreboard.padel.awayPlayer1]
+            if scoreboard.padel.type == .doubles {
+                home.append(scoreboard.padel.homePlayer2)
+                away.append(scoreboard.padel.awayPlayer2)
+            }
+            let score = scoreboard.padel.score.map { WatchProtocolPadelScoreboardScore(
+                home: $0.home,
+                away: $0.away
+            ) }
+            let message = WatchProtocolPadelScoreboard(id: id, home: home, away: away, score: score)
+            data = try JSONEncoder().encode(message)
+        } catch {
+            return
+        }
+        sendMessageToWatch(type: .padelScoreboard, data: data)
+    }
+
+    private func sendRemovePadelScoreboardToWatch(id: UUID) {
+        guard isWatchReachable() else {
+            return
+        }
+        sendMessageToWatch(type: .removePadelScoreboard, data: id.uuidString)
+    }
+
+    func sendScoreboardPlayersToWatch() {
+        guard isWatchReachable() else {
+            return
+        }
+        var data: Data
+        do {
+            let message = database.scoreboardPlayers!.map { WatchProtocolScoreboardPlayer(
+                id: $0.id,
+                name: $0.name
+            ) }
+            data = try JSONEncoder().encode(message)
+        } catch {
+            return
+        }
+        sendMessageToWatch(type: .scoreboardPlayers, data: data)
     }
 
     private func resetWorkoutStats() {
@@ -6743,6 +7042,19 @@ extension Model: WCSessionDelegate {
                 self.sendIsLiveToWatch(isLive: self.isLive)
                 self.sendIsRecordingToWatch(isRecording: self.isRecording)
                 self.sendIsMutedToWatch(isMuteOn: self.isMuteOn)
+                self.sendViewerCountWatch()
+                self.sendScoreboardPlayersToWatch()
+                let sceneWidgets = self.getSelectedScene()?.widgets ?? []
+                for id in self.padelScoreboardEffects.keys {
+                    if let sceneWidget = sceneWidgets.first(where: { $0.widgetId == id }),
+                       sceneWidget.enabled,
+                       let scoreboard = self.findWidget(id: id)?.scoreboard
+                    {
+                        self.sendUpdatePadelScoreboardToWatch(id: id, scoreboard: scoreboard)
+                    } else {
+                        self.sendRemovePadelScoreboardToWatch(id: id)
+                    }
+                }
             }
         }
     }
@@ -6913,6 +7225,43 @@ extension Model: WCSessionDelegate {
         }
     }
 
+    private func handleUpdatePadelScoreboard(_ data: Any) {
+        guard let data = data as? Data else {
+            return
+        }
+        guard let scoreboard = try? JSONDecoder().decode(WatchProtocolPadelScoreboard.self, from: data) else {
+            return
+        }
+        DispatchQueue.main.async {
+            guard let widget = self.findWidget(id: scoreboard.id) else {
+                return
+            }
+            widget.scoreboard!.padel.score = scoreboard.score.map {
+                let score = SettingsWidgetScoreboardScore()
+                score.home = $0.home
+                score.away = $0.away
+                return score
+            }
+            widget.scoreboard!.padel.homePlayer1 = scoreboard.home[0]
+            if scoreboard.home.count > 1 {
+                widget.scoreboard!.padel.homePlayer2 = scoreboard.home[1]
+            }
+            widget.scoreboard!.padel.awayPlayer1 = scoreboard.away[0]
+            if scoreboard.away.count > 1 {
+                widget.scoreboard!.padel.awayPlayer2 = scoreboard.away[1]
+            }
+            guard let padelScoreboardEffect = self.padelScoreboardEffects[scoreboard.id] else {
+                return
+            }
+            padelScoreboardEffect
+                .update(scoreboard: self.padelScoreboardSettingsToEffect(widget.scoreboard!.padel))
+        }
+    }
+
+    private func handleCreateStreamMarker() {
+        createStreamMarker()
+    }
+
     func session(
         _: WCSession,
         didReceiveMessage message: [String: Any],
@@ -6955,6 +7304,10 @@ extension Model: WCSessionDelegate {
             handleSetSceneMessage(data)
         case .updateWorkoutStats:
             handleUpdateWorkoutStats(data)
+        case .updatePadelScoreboard:
+            handleUpdatePadelScoreboard(data)
+        case .createStreamMarker:
+            handleCreateStreamMarker()
         default:
             break
         }
@@ -8288,6 +8641,15 @@ extension Model {
     func getDjiDeviceState(device: SettingsDjiDevice) -> DjiDeviceState? {
         return djiDeviceWrappers[device.id]?.device.getState()
     }
+
+    func removeDjiDevices(offsets: IndexSet) {
+        for offset in offsets {
+            let device = database.djiDevices!.devices[offset]
+            stopDjiDeviceLiveStream(device: device)
+            djiDeviceWrappers.removeValue(forKey: device.id)
+        }
+        database.djiDevices!.devices.remove(atOffsets: offsets)
+    }
 }
 
 extension Model {
@@ -8436,7 +8798,8 @@ extension Model: TwitchEventSubDelegate {
     func twitchEventSubChannelCheer(event: TwitchEventSubChannelCheerEvent) {
         DispatchQueue.main.async {
             let user = event.user_name ?? String(localized: "Anonymous")
-            let text = String(localized: "cheered \(event.bits) bits!")
+            let bits = countFormatter.format(event.bits)
+            let text = String(localized: "cheered \(bits) bits!")
             self.makeToast(title: "\(user) \(text)", subTitle: event.message)
             self.playAlert(alert: .twitchCheer(event))
             self.appendTwitchChatAlertMessage(
@@ -8444,8 +8807,8 @@ extension Model: TwitchEventSubDelegate {
                 text: "\(text) \(event.message)",
                 title: String(localized: "Cheer"),
                 color: .green,
-                skipTextToSpeech: true,
-                image: "suit.diamond"
+                image: "suit.diamond",
+                bits: ""
             )
         }
     }
@@ -8513,28 +8876,27 @@ extension Model: TwitchEventSubDelegate {
         text: String,
         title: String,
         color: Color,
-        skipTextToSpeech: Bool = false,
         image: String? = nil,
-        kind: ChatHighlightKind? = nil
+        kind: ChatHighlightKind? = nil,
+        bits: String? = nil
     ) {
-        var id = 0
         appendChatMessage(platform: .twitch,
                           user: user,
                           userId: nil,
                           userColor: nil,
                           userBadges: [],
-                          segments: makeChatPostTextSegments(text: text, id: &id),
+                          segments: twitchChat.createSegmentsNoTwitchEmotes(text: text, bits: bits),
                           timestamp: digitalClock,
                           timestampTime: .now,
                           isAction: false,
                           isSubscriber: false,
                           isModerator: false,
+                          bits: nil,
                           highlight: .init(
                               kind: kind ?? .redemption,
                               color: color,
                               image: image ?? "medal",
-                              title: title,
-                              skipTextToSpeech: skipTextToSpeech
+                              title: title
                           ))
     }
 

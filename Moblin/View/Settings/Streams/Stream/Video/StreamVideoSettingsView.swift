@@ -3,6 +3,8 @@ import SwiftUI
 struct StreamVideoSettingsView: View {
     @EnvironmentObject var model: Model
     var stream: SettingsStream
+    @State var codec: String
+    @State var bitrate: UInt32
 
     private func onResolutionChange(resolution: String) {
         stream.resolution = SettingsStreamResolution(rawValue: resolution)!
@@ -19,6 +21,7 @@ struct StreamVideoSettingsView: View {
     }
 
     private func onBitrateChange(bitrate: UInt32) {
+        self.bitrate = bitrate
         stream.bitrate = bitrate
         if stream.enabled {
             model.setStreamBitrate(stream: stream)
@@ -26,6 +29,7 @@ struct StreamVideoSettingsView: View {
     }
 
     private func onCodecChange(codec: String) {
+        self.codec = codec
         stream.codec = SettingsStreamCodec(rawValue: codec)!
         model.storeAndReloadStreamIfEnabled(stream: stream)
     }
@@ -69,12 +73,16 @@ struct StreamVideoSettingsView: View {
                     }
                 }
                 .disabled(stream.enabled && (model.isLive || model.isRecording))
-                if model.database.showAllSettings! {
+            } footer: {
+                Text("Lower FPS generally gives brighter image in low light conditions.")
+            }
+            if model.database.showAllSettings! {
+                Section {
                     HStack {
                         Text("Codec")
                         Spacer()
                         Picker("", selection: Binding(get: {
-                            stream.codec.rawValue
+                            codec
                         }, set: onCodecChange)) {
                             ForEach(codecs, id: \.self) {
                                 Text($0)
@@ -82,11 +90,18 @@ struct StreamVideoSettingsView: View {
                         }
                     }
                     .disabled(stream.enabled && model.isLive)
+                } footer: {
+                    Text("""
+                    H.265/HEVC generally reuqires less bandwidth for same image quality. RTMP \
+                    generally only supports H.264/AVC.
+                    """)
+                }
+                Section {
                     HStack {
                         Text("Bitrate")
                         Spacer()
                         Picker("", selection: Binding(get: {
-                            stream.bitrate
+                            bitrate
                         }, set: onBitrateChange)) {
                             ForEach(model.database.bitratePresets) { preset in
                                 Text(formatBytesPerSecond(speed: Int64(preset.bitrate)))
@@ -94,6 +109,10 @@ struct StreamVideoSettingsView: View {
                             }
                         }
                     }
+                } footer: {
+                    Text("About 5-8 Mbps is usually enough for decent image quality.")
+                }
+                Section {
                     NavigationLink {
                         TextEditView(
                             title: String(localized: "Key frame interval"),
@@ -120,6 +139,27 @@ struct StreamVideoSettingsView: View {
                         model.storeAndReloadStreamIfEnabled(stream: stream)
                     }))
                     .disabled(stream.enabled && model.isLive)
+                }
+                Section {
+                    Toggle("Adaptive resolution", isOn: Binding(get: {
+                        stream.adaptiveEncoderResolution!
+                    }, set: { value in
+                        stream.adaptiveEncoderResolution = value
+                        model.storeAndReloadStreamIfEnabled(stream: stream)
+                    }))
+                    .disabled(stream.enabled && model.isLive)
+                    Toggle("Adaptive FPS", isOn: Binding(get: {
+                        stream.adaptiveEncoderFps!
+                    }, set: { value in
+                        stream.adaptiveEncoderFps = value
+                        model.storeAndReloadStreamIfEnabled(stream: stream)
+                    }))
+                    .disabled(stream.enabled && model.isLive)
+                } footer: {
+                    Text("""
+                    Automatically lower resolution and/or FPS when the available bandwidth is \
+                    low. Generally gives better image quality at low (<750 Kbps) bitrates.
+                    """)
                 }
             }
         }

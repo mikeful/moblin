@@ -47,6 +47,8 @@ final class Media: NSObject {
     var onAudioBuffer: ((CMSampleBuffer) -> Void)!
     var onLowFpsImage: ((Data?, UInt64) -> Void)!
     var onFindVideoFormatError: ((String, String) -> Void)!
+    var onRecorderFinished: (() -> Void)!
+    var onRecorderError: (() -> Void)!
     var onNoTorch: (() -> Void)!
     private var adaptiveBitrate: AdaptiveBitrate?
     private var failedVideoEffect: String?
@@ -221,14 +223,10 @@ final class Media: NSObject {
             networkInterfaceNames: networkInterfaceNames,
             connectionPriorities: connectionPriorities
         )
-        switch adaptiveBitrateAlgorithm {
-        case .fastIrl, .slowIrl, .customIrl:
-            adaptiveBitrate = AdaptiveBitrateSrtFight(targetBitrate: targetBitrate, delegate: self)
-        case .belabox:
-            adaptiveBitrate = AdaptiveBitrateSrtBela(targetBitrate: targetBitrate, delegate: self)
-        case nil:
-            adaptiveBitrate = nil
-        }
+        srtSetAdaptiveBitrateAlgorithm(
+            targetBitrate: targetBitrate,
+            adaptiveBitrateAlgorithm: adaptiveBitrateAlgorithm
+        )
     }
 
     func srtStopStream() {
@@ -237,6 +235,20 @@ final class Media: NSObject {
         srtlaClient = nil
         srtConnectedObservation = nil
         adaptiveBitrate = nil
+    }
+
+    func srtSetAdaptiveBitrateAlgorithm(
+        targetBitrate: UInt32,
+        adaptiveBitrateAlgorithm: SettingsStreamSrtAdaptiveBitrateAlgorithm?
+    ) {
+        switch adaptiveBitrateAlgorithm {
+        case .fastIrl, .slowIrl, .customIrl:
+            adaptiveBitrate = AdaptiveBitrateSrtFight(targetBitrate: targetBitrate, delegate: self)
+        case .belabox:
+            adaptiveBitrate = AdaptiveBitrateSrtBela(targetBitrate: targetBitrate, delegate: self)
+        case nil:
+            adaptiveBitrate = nil
+        }
     }
 
     func setNetworkInterfaceNames(networkInterfaceNames: [SettingsNetworkInterfaceName]) {
@@ -662,16 +674,16 @@ final class Media: NSObject {
         netStream?.takeSnapshot(onComplete: onComplete)
     }
 
-    func setVideoSessionPreset(preset: AVCaptureSession.Preset) {
-        netStream?.setSessionPreset(preset: preset)
-    }
-
-    func setVideoSize(width: Int32, height: Int32) {
-        netStream?.videoSettings.videoSize = .init(width: width, height: height)
+    func setVideoSize(capture: CGSize, output: CGSize) {
+        netStream?.setVideoSize(capture: capture, output: output)
+        netStream?.videoEncodecSettings.videoSize = .init(
+            width: Int32(output.width),
+            height: Int32(output.height)
+        )
     }
 
     func getVideoSize() -> CGSize {
-        guard let size = netStream?.videoSettings.videoSize else {
+        guard let size = netStream?.videoEncodecSettings.videoSize else {
             return .init(width: 1920, height: 1080)
         }
         return CGSize(width: CGFloat(size.width), height: CGFloat(size.height))
@@ -690,7 +702,7 @@ final class Media: NSObject {
     func updateVideoStreamBitrate(bitrate: UInt32) {
         multiplier ^= 1
         let bitRate = getVideoStreamBitrate(bitrate: bitrate)
-        netStream?.videoSettings.bitRate = bitRate + multiplier * (bitRate / 10)
+        netStream?.videoEncodecSettings.bitRate = bitRate + multiplier * (bitRate / 10)
     }
 
     func getVideoStreamBitrate(bitrate: UInt32) -> UInt32 {
@@ -704,20 +716,31 @@ final class Media: NSObject {
     }
 
     func setVideoStreamBitrate(bitrate: UInt32) {
-        adaptiveBitrate?.setTargetBitrate(bitrate: bitrate)
-        netStream?.videoSettings.bitRate = bitrate
+        if let adaptiveBitrate {
+            adaptiveBitrate.setTargetBitrate(bitrate: bitrate)
+        } else {
+            netStream?.videoEncodecSettings.bitRate = bitrate
+        }
     }
 
     func setVideoProfile(profile: CFString) {
-        netStream?.videoSettings.profileLevel = profile as String
+        netStream?.videoEncodecSettings.profileLevel = profile as String
     }
 
     func setAllowFrameReordering(value: Bool) {
-        netStream?.videoSettings.allowFrameReordering = value
+        netStream?.videoEncodecSettings.allowFrameReordering = value
     }
 
     func setStreamKeyFrameInterval(seconds: Int32) {
-        netStream?.videoSettings.maxKeyFrameIntervalDuration = seconds
+        netStream?.videoEncodecSettings.maxKeyFrameIntervalDuration = seconds
+    }
+
+    func setStreamAdaptiveResolution(value: Bool) {
+        netStream?.videoEncodecSettings.adaptiveResolution = value
+    }
+
+    func setStreamAdaptiveFps(value: Bool) {
+        netStream?.videoEncodecSettings.adaptiveFps = value
     }
 
     func setAudioStreamBitrate(bitrate: Int) {
@@ -920,12 +943,16 @@ extension Media: NetStreamDelegate {
         onFindVideoFormatError(findVideoFormatError, activeFormat)
     }
 
-    func stream(_: NetStream, recorderFinishWriting _: AVAssetWriter) {
-        logger.info("stream: Recording finished")
-    }
-
     func streamAudio(_: NetStream, sampleBuffer: CMSampleBuffer) {
         onAudioBuffer(sampleBuffer)
+    }
+
+    func streamRecorderFinished() {
+        onRecorderFinished()
+    }
+
+    func streamRecorderError() {
+        onRecorderError()
     }
 
     func streamNoTorch() {
@@ -976,7 +1003,7 @@ extension Media: SrtlaDelegate {
 
 extension Media: AdaptiveBitrateDelegate {
     func adaptiveBitrateSetVideoStreamBitrate(bitrate: UInt32) {
-        netStream?.videoSettings.bitRate = bitrate
+        netStream?.videoEncodecSettings.bitRate = bitrate
     }
 }
 

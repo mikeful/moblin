@@ -99,13 +99,16 @@
 		0332EF5E2B3CAEE400BC3C16 /* RtmpServerSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0332EF5D2B3CAEE400BC3C16 /* RtmpServerSettingsView.swift */; };
 		0332EF612B3CB1E300BC3C16 /* RtmpServerStreamSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0332EF602B3CB1E300BC3C16 /* RtmpServerStreamSettingsView.swift */; };
 		0333322D2C48A31700C87D62 /* DjiDeviceScannerSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0333322C2C48A31700C87D62 /* DjiDeviceScannerSettingsView.swift */; };
+		033A46EF2CD881AE00119CE3 /* CMVideoDimensions+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 033A46EE2CD881A700119CE3 /* CMVideoDimensions+Extension.swift */; };
 		033BEAC42C0FCC0B005F4E06 /* NWWebSocket in Frameworks */ = {isa = PBXBuildFile; productRef = 033BEAC32C0FCC0B005F4E06 /* NWWebSocket */; };
 		033BEACA2C101B52005F4E06 /* NetworkInterfaceTypeSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 033BEAC92C101B52005F4E06 /* NetworkInterfaceTypeSelector.swift */; };
 		033C92FF2C0A29B800161DFC /* StreamWizardNetworkSetupIrlToolkitSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 033C92FE2C0A29B800161DFC /* StreamWizardNetworkSetupIrlToolkitSettingsView.swift */; };
+		033FD71B2CC622D80073C6EC /* PadelScoreboardEffect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 033FD71A2CC622D40073C6EC /* PadelScoreboardEffect.swift */; };
+		033FD71E2CC8A4A50073C6EC /* WidgetScoreboardSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 033FD71D2CC8A4A50073C6EC /* WidgetScoreboardSettingsView.swift */; };
 		03403DF62AD05CA60079D8E4 /* WidgetBrowserSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03403DF52AD05CA60079D8E4 /* WidgetBrowserSettingsView.swift */; };
-		0342F1A12C627A70004DD3EA /* IrlClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0342F1A02C627A70004DD3EA /* IrlClient.swift */; };
-		0342F1A32C627A87004DD3EA /* IrlServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0342F1A22C627A87004DD3EA /* IrlServer.swift */; };
-		0342F1A52C627A8F004DD3EA /* IrlCommon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0342F1A42C627A8F004DD3EA /* IrlCommon.swift */; };
+		0342F1A12C627A70004DD3EA /* MoblinkClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0342F1A02C627A70004DD3EA /* MoblinkClient.swift */; };
+		0342F1A32C627A87004DD3EA /* MoblinkServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0342F1A22C627A87004DD3EA /* MoblinkServer.swift */; };
+		0342F1A52C627A8F004DD3EA /* MoblinkCommon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0342F1A42C627A8F004DD3EA /* MoblinkCommon.swift */; };
 		0346B5EC2B9AD1BF00999109 /* MoblinWatch-InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 0346B5EB2B9AD1BF00999109 /* MoblinWatch-InfoPlist.xcstrings */; };
 		0346B5EE2B9AD1BF00999109 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 0346B5ED2B9AD1BF00999109 /* InfoPlist.xcstrings */; };
 		0346B5F02B9AD1BF00999109 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 0346B5EF2B9AD1BF00999109 /* Localizable.xcstrings */; };
@@ -135,13 +138,11 @@
 		0359F8AD2BD3DA61005BFDA8 /* AudioCodecRingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0359F80F2BD3DA5F005BFDA8 /* AudioCodecRingBuffer.swift */; };
 		0359F8AE2BD3DA61005BFDA8 /* VideoCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0359F8102BD3DA5F005BFDA8 /* VideoCodec.swift */; };
 		0359F8AF2BD3DA61005BFDA8 /* VideoCodecSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0359F8112BD3DA5F005BFDA8 /* VideoCodecSettings.swift */; };
-		0359F8B02BD3DA61005BFDA8 /* VideoSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0359F8122BD3DA5F005BFDA8 /* VideoSize.swift */; };
 		0359F8B12BD3DA61005BFDA8 /* VTSessionConvertible.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0359F8132BD3DA5F005BFDA8 /* VTSessionConvertible.swift */; };
 		0359F8B22BD3DA61005BFDA8 /* VTSessionOption.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0359F8142BD3DA5F005BFDA8 /* VTSessionOption.swift */; };
 		0359F8B32BD3DA61005BFDA8 /* AudioStreamBasicDescription+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0359F8162BD3DA5F005BFDA8 /* AudioStreamBasicDescription+Extension.swift */; };
 		0359F8B42BD3DA61005BFDA8 /* AVAudioPCMBuffer+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0359F8172BD3DA5F005BFDA8 /* AVAudioPCMBuffer+Extension.swift */; };
 		0359F8B62BD3DA61005BFDA8 /* AVCaptureDevice.Format+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0359F8192BD3DA5F005BFDA8 /* AVCaptureDevice.Format+Extension.swift */; };
-		0359F8B82BD3DA61005BFDA8 /* AVCaptureSession.Preset+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0359F81B2BD3DA5F005BFDA8 /* AVCaptureSession.Preset+Extension.swift */; };
 		0359F8B92BD3DA61005BFDA8 /* AVFrameRateRange+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0359F81C2BD3DA5F005BFDA8 /* AVFrameRateRange+Extension.swift */; };
 		0359F8BA2BD3DA61005BFDA8 /* CMAudioFormatDescription+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0359F81D2BD3DA5F005BFDA8 /* CMAudioFormatDescription+Extension.swift */; };
 		0359F8BD2BD3DA61005BFDA8 /* CMSampleBuffer+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0359F8202BD3DA5F005BFDA8 /* CMSampleBuffer+Extension.swift */; };
@@ -345,6 +346,7 @@
 		03B16A2D2B35D72F00E5AB07 /* CameraSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B16A2C2B35D72F00E5AB07 /* CameraSettingsView.swift */; };
 		03B16A312B35D74800E5AB07 /* DisplaySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B16A302B35D74800E5AB07 /* DisplaySettingsView.swift */; };
 		03B2189F2C3E4E4E001FDE57 /* WidgetSceneSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B2189E2C3E4E4E001FDE57 /* WidgetSceneSettingsView.swift */; };
+		03B21A3B2CD09A6200E22590 /* PadelScoreboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B21A3A2CD09A5E00E22590 /* PadelScoreboardView.swift */; };
 		03B373F62A9EF98E0028DDD5 /* ControlBarLandscapeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B373F52A9EF98E0028DDD5 /* ControlBarLandscapeView.swift */; };
 		03B373F92A9EFB340028DDD5 /* BatteryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B373F82A9EFB340028DDD5 /* BatteryView.swift */; };
 		03B373FD2A9F35EF0028DDD5 /* CommonUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B373FC2A9F35EF0028DDD5 /* CommonUtils.swift */; };
@@ -593,13 +595,17 @@
 		0332EF5D2B3CAEE400BC3C16 /* RtmpServerSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RtmpServerSettingsView.swift; sourceTree = "<group>"; };
 		0332EF602B3CB1E300BC3C16 /* RtmpServerStreamSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RtmpServerStreamSettingsView.swift; sourceTree = "<group>"; };
 		0333322C2C48A31700C87D62 /* DjiDeviceScannerSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DjiDeviceScannerSettingsView.swift; sourceTree = "<group>"; };
+		033A46EE2CD881A700119CE3 /* CMVideoDimensions+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMVideoDimensions+Extension.swift"; sourceTree = "<group>"; };
 		033BEAC92C101B52005F4E06 /* NetworkInterfaceTypeSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkInterfaceTypeSelector.swift; sourceTree = "<group>"; };
 		033C92FE2C0A29B800161DFC /* StreamWizardNetworkSetupIrlToolkitSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamWizardNetworkSetupIrlToolkitSettingsView.swift; sourceTree = "<group>"; };
 		033C97612C9DAB4D002107A4 /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		033FD7182CC52E1D0073C6EC /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
+		033FD71A2CC622D40073C6EC /* PadelScoreboardEffect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadelScoreboardEffect.swift; sourceTree = "<group>"; };
+		033FD71D2CC8A4A50073C6EC /* WidgetScoreboardSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetScoreboardSettingsView.swift; sourceTree = "<group>"; };
 		03403DF52AD05CA60079D8E4 /* WidgetBrowserSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetBrowserSettingsView.swift; sourceTree = "<group>"; };
-		0342F1A02C627A70004DD3EA /* IrlClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IrlClient.swift; sourceTree = "<group>"; };
-		0342F1A22C627A87004DD3EA /* IrlServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IrlServer.swift; sourceTree = "<group>"; };
-		0342F1A42C627A8F004DD3EA /* IrlCommon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IrlCommon.swift; sourceTree = "<group>"; };
+		0342F1A02C627A70004DD3EA /* MoblinkClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoblinkClient.swift; sourceTree = "<group>"; };
+		0342F1A22C627A87004DD3EA /* MoblinkServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoblinkServer.swift; sourceTree = "<group>"; };
+		0342F1A42C627A8F004DD3EA /* MoblinkCommon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoblinkCommon.swift; sourceTree = "<group>"; };
 		0346B5EB2B9AD1BF00999109 /* MoblinWatch-InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = "MoblinWatch-InfoPlist.xcstrings"; sourceTree = "<group>"; };
 		0346B5ED2B9AD1BF00999109 /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		0346B5EF2B9AD1BF00999109 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
@@ -631,13 +637,11 @@
 		0359F80F2BD3DA5F005BFDA8 /* AudioCodecRingBuffer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioCodecRingBuffer.swift; sourceTree = "<group>"; };
 		0359F8102BD3DA5F005BFDA8 /* VideoCodec.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VideoCodec.swift; sourceTree = "<group>"; };
 		0359F8112BD3DA5F005BFDA8 /* VideoCodecSettings.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VideoCodecSettings.swift; sourceTree = "<group>"; };
-		0359F8122BD3DA5F005BFDA8 /* VideoSize.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VideoSize.swift; sourceTree = "<group>"; };
 		0359F8132BD3DA5F005BFDA8 /* VTSessionConvertible.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VTSessionConvertible.swift; sourceTree = "<group>"; };
 		0359F8142BD3DA5F005BFDA8 /* VTSessionOption.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VTSessionOption.swift; sourceTree = "<group>"; };
 		0359F8162BD3DA5F005BFDA8 /* AudioStreamBasicDescription+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "AudioStreamBasicDescription+Extension.swift"; sourceTree = "<group>"; };
 		0359F8172BD3DA5F005BFDA8 /* AVAudioPCMBuffer+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "AVAudioPCMBuffer+Extension.swift"; sourceTree = "<group>"; };
 		0359F8192BD3DA5F005BFDA8 /* AVCaptureDevice.Format+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "AVCaptureDevice.Format+Extension.swift"; sourceTree = "<group>"; };
-		0359F81B2BD3DA5F005BFDA8 /* AVCaptureSession.Preset+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "AVCaptureSession.Preset+Extension.swift"; sourceTree = "<group>"; };
 		0359F81C2BD3DA5F005BFDA8 /* AVFrameRateRange+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "AVFrameRateRange+Extension.swift"; sourceTree = "<group>"; };
 		0359F81D2BD3DA5F005BFDA8 /* CMAudioFormatDescription+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "CMAudioFormatDescription+Extension.swift"; sourceTree = "<group>"; };
 		0359F8202BD3DA5F005BFDA8 /* CMSampleBuffer+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "CMSampleBuffer+Extension.swift"; sourceTree = "<group>"; };
@@ -884,6 +888,7 @@
 		03B16A2C2B35D72F00E5AB07 /* CameraSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraSettingsView.swift; sourceTree = "<group>"; };
 		03B16A302B35D74800E5AB07 /* DisplaySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplaySettingsView.swift; sourceTree = "<group>"; };
 		03B2189E2C3E4E4E001FDE57 /* WidgetSceneSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSceneSettingsView.swift; sourceTree = "<group>"; };
+		03B21A3A2CD09A5E00E22590 /* PadelScoreboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadelScoreboardView.swift; sourceTree = "<group>"; };
 		03B373F52A9EF98E0028DDD5 /* ControlBarLandscapeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlBarLandscapeView.swift; sourceTree = "<group>"; };
 		03B373F82A9EFB340028DDD5 /* BatteryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryView.swift; sourceTree = "<group>"; };
 		03B373FC2A9F35EF0028DDD5 /* CommonUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommonUtils.swift; sourceTree = "<group>"; };
@@ -1208,6 +1213,7 @@
 				03828C2E2C3B09FF00F5A8AC /* Map */,
 				030499602C4038B2003488F4 /* QrCode */,
 				03B2189D2C3E4E3D001FDE57 /* Scene */,
+				033FD71C2CC8A4940073C6EC /* Scoreboard */,
 				037132CC2C29FEED00393605 /* Text */,
 				030C762E2CBBF52B0062D8FD /* VideoSource */,
 				03A983602A9A05D7008FF0DB /* WidgetSettingsView.swift */,
@@ -1260,6 +1266,7 @@
 		031C15BC2B9336C700BA967D /* Control */ = {
 			isa = PBXGroup;
 			children = (
+				03B21A3A2CD09A5E00E22590 /* PadelScoreboardView.swift */,
 				031C15BE2B9336D200BA967D /* ControlView.swift */,
 			);
 			path = Control;
@@ -1370,6 +1377,22 @@
 			path = RtmpServer;
 			sourceTree = "<group>";
 		};
+		033FD7192CC622A60073C6EC /* Scoreboards */ = {
+			isa = PBXGroup;
+			children = (
+				033FD71A2CC622D40073C6EC /* PadelScoreboardEffect.swift */,
+			);
+			path = Scoreboards;
+			sourceTree = "<group>";
+		};
+		033FD71C2CC8A4940073C6EC /* Scoreboard */ = {
+			isa = PBXGroup;
+			children = (
+				033FD71D2CC8A4A50073C6EC /* WidgetScoreboardSettingsView.swift */,
+			);
+			path = Scoreboard;
+			sourceTree = "<group>";
+		};
 		03403DF32AD05C700079D8E4 /* Browser */ = {
 			isa = PBXGroup;
 			children = (
@@ -1378,15 +1401,15 @@
 			path = Browser;
 			sourceTree = "<group>";
 		};
-		0342F19F2C627A3D004DD3EA /* Irl */ = {
+		0342F19F2C627A3D004DD3EA /* Moblink */ = {
 			isa = PBXGroup;
 			children = (
-				0342F1A02C627A70004DD3EA /* IrlClient.swift */,
-				0342F1A42C627A8F004DD3EA /* IrlCommon.swift */,
-				0342F1A22C627A87004DD3EA /* IrlServer.swift */,
+				0342F1A02C627A70004DD3EA /* MoblinkClient.swift */,
+				0342F1A42C627A8F004DD3EA /* MoblinkCommon.swift */,
+				0342F1A22C627A87004DD3EA /* MoblinkServer.swift */,
 				03FB42322C68EE6D0009FB26 /* PROTOCOL.md */,
 			);
-			path = Irl;
+			path = Moblink;
 			sourceTree = "<group>";
 		};
 		0346B5F22B9AF4D300999109 /* RemoteControlAssistant */ = {
@@ -1478,7 +1501,6 @@
 				0359F80F2BD3DA5F005BFDA8 /* AudioCodecRingBuffer.swift */,
 				0359F8102BD3DA5F005BFDA8 /* VideoCodec.swift */,
 				0359F8112BD3DA5F005BFDA8 /* VideoCodecSettings.swift */,
-				0359F8122BD3DA5F005BFDA8 /* VideoSize.swift */,
 				0359F8132BD3DA5F005BFDA8 /* VTSessionConvertible.swift */,
 				0359F8142BD3DA5F005BFDA8 /* VTSessionOption.swift */,
 			);
@@ -1492,9 +1514,9 @@
 				0359F8172BD3DA5F005BFDA8 /* AVAudioPCMBuffer+Extension.swift */,
 				03DAC9382BFE6A1F005EB92C /* AVCaptureColorSpace+Extension.swift */,
 				0359F8192BD3DA5F005BFDA8 /* AVCaptureDevice.Format+Extension.swift */,
-				0359F81B2BD3DA5F005BFDA8 /* AVCaptureSession.Preset+Extension.swift */,
 				0359F81C2BD3DA5F005BFDA8 /* AVFrameRateRange+Extension.swift */,
 				0359F81D2BD3DA5F005BFDA8 /* CMAudioFormatDescription+Extension.swift */,
+				033A46EE2CD881A700119CE3 /* CMVideoDimensions+Extension.swift */,
 				03BC90A82BD4F6B000529987 /* CMVideoFormatDescription+Extension.swift */,
 				0359F8212BD3DA5F005BFDA8 /* CVPixelBuffer+Extension.swift */,
 				0359F8232BD3DA5F005BFDA8 /* Data+Extension.swift */,
@@ -1731,7 +1753,7 @@
 				03BC115B2AE4BD6200C38FC4 /* Emotes */,
 				0359F80C2BD3DA4B005BFDA8 /* HaishinKit */,
 				0391D2012CB2FFFC008AB44B /* Intents */,
-				0342F19F2C627A3D004DD3EA /* Irl */,
+				0342F19F2C627A3D004DD3EA /* Moblink */,
 				03BDE2202B24364700DF193A /* OBS */,
 				030D487F2B35E4AF003B2014 /* Platforms */,
 				039ADE452B55C20800FE0F59 /* RemoteControl */,
@@ -2266,6 +2288,7 @@
 		03B374052AA0EA370028DDD5 /* VideoEffects */ = {
 			isa = PBXGroup;
 			children = (
+				033FD7192CC622A60073C6EC /* Scoreboards */,
 				033235442BFBB71C00B897A5 /* MetalPetal */,
 				037FE02F2C594CE40067B5AC /* AlertsEffect.swift */,
 				03EBEA622ACB4A17000DF427 /* BrowserEffect.swift */,
@@ -2845,6 +2868,7 @@
 			files = (
 				032BAEF12C0C78FF005D5DA7 /* DeepLinkCreatorSettingsView.swift in Sources */,
 				0359F8F52BD3DA61005BFDA8 /* RTMPStreamInfo.swift in Sources */,
+				033FD71E2CC8A4A50073C6EC /* WidgetScoreboardSettingsView.swift in Sources */,
 				0359F8C12BD3DA61005BFDA8 /* ExpressibleByIntegerLiteral+Extension.swift in Sources */,
 				0325D0BE2BB3DDD6007EE85B /* KickChannel.swift in Sources */,
 				0359F8AC2BD3DA61005BFDA8 /* AudioCodecOutputSettings.swift in Sources */,
@@ -2871,6 +2895,7 @@
 				034844F22B579DF30089B874 /* RemoteControl.swift in Sources */,
 				03A930092C1440EB00BB9679 /* NalUnitReader.swift in Sources */,
 				0359F8D92BD3DA61005BFDA8 /* AvcFormatStream.swift in Sources */,
+				033FD71B2CC622D80073C6EC /* PadelScoreboardEffect.swift in Sources */,
 				039ADE472B55C23600FE0F59 /* RemoteControlStreamer.swift in Sources */,
 				0359F8BD2BD3DA61005BFDA8 /* CMSampleBuffer+Extension.swift in Sources */,
 				030C76302CBBF5470062D8FD /* WidgetVideoSourceSettingsView.swift in Sources */,
@@ -2935,7 +2960,7 @@
 				03BA3B432C9019D500DEFA3E /* AtkinsonDithering.swift in Sources */,
 				0359F8AD2BD3DA61005BFDA8 /* AudioCodecRingBuffer.swift in Sources */,
 				03D3C0512B452D61006BAEAC /* StreamRecordingSettingsView.swift in Sources */,
-				0342F1A52C627A8F004DD3EA /* IrlCommon.swift in Sources */,
+				0342F1A52C627A8F004DD3EA /* MoblinkCommon.swift in Sources */,
 				0325D0B42BB29713007EE85B /* ChatUsernamesToIgnoreSettingsView.swift in Sources */,
 				03980C552C5E74A9000ED476 /* VoicesView.swift in Sources */,
 				0302F07F2B320B0500B06FF0 /* StreamWizardChatSettingsView.swift in Sources */,
@@ -2943,6 +2968,7 @@
 				0359F8B12BD3DA61005BFDA8 /* VTSessionConvertible.swift in Sources */,
 				0379BBAF2AAD96B200B718B6 /* DebugSettingsView.swift in Sources */,
 				039C88DD2C14DC2000682729 /* IsoTypeBufferUtil.swift in Sources */,
+				033A46EF2CD881AE00119CE3 /* CMVideoDimensions+Extension.swift in Sources */,
 				03FB4B2F2AD8CF83005AA183 /* BitratePresetsSettingsView.swift in Sources */,
 				03B373F92A9EFB340028DDD5 /* BatteryView.swift in Sources */,
 				037EBE772B666F66004D5774 /* DrawOnStreamView.swift in Sources */,
@@ -3127,8 +3153,6 @@
 				03A22DAC2C0EE45600A59208 /* SrtlaServerClientConnection.swift in Sources */,
 				031F91EB2B38A27D00C898E1 /* StreamWizardObsRemoteControlSettingsView.swift in Sources */,
 				032815DF2AC9885C001F8A85 /* TripleEffect.swift in Sources */,
-				0359F8B82BD3DA61005BFDA8 /* AVCaptureSession.Preset+Extension.swift in Sources */,
-				0359F8B02BD3DA61005BFDA8 /* VideoSize.swift in Sources */,
 				03584BED2BE49B1B007E61F6 /* FaceView.swift in Sources */,
 				0359F8C72BD3DA61005BFDA8 /* FLVAVCPacketType.swift in Sources */,
 				03B374022AA0354C0028DDD5 /* GrayScaleEffect.swift in Sources */,
@@ -3140,7 +3164,7 @@
 				035735822BC6303F00F4E87D /* WatchDisplaySettingsView.swift in Sources */,
 				03E95AC62ADAF58900DAE2DF /* ZoomSwitchToSettingsView.swift in Sources */,
 				0359F8C62BD3DA61005BFDA8 /* FLVAudioCodec.swift in Sources */,
-				0342F1A12C627A70004DD3EA /* IrlClient.swift in Sources */,
+				0342F1A12C627A70004DD3EA /* MoblinkClient.swift in Sources */,
 				03A983632A9A05D7008FF0DB /* SettingsView.swift in Sources */,
 				0359F8D42BD3DA61005BFDA8 /* PreviewView.swift in Sources */,
 				032B4ED42C34910A00204547 /* MediaPlayerControlsView.swift in Sources */,
@@ -3172,7 +3196,7 @@
 				031863C72C8C4BEA00CECA33 /* FaxReceiver.swift in Sources */,
 				0359F8CF2BD3DA61005BFDA8 /* FLVVideoPacketType.swift in Sources */,
 				034FA1BB2C151E3600695825 /* AdaptiveBitrateRistExperiment.swift in Sources */,
-				0342F1A32C627A87004DD3EA /* IrlServer.swift in Sources */,
+				0342F1A32C627A87004DD3EA /* MoblinkServer.swift in Sources */,
 				0332EF612B3CB1E300BC3C16 /* RtmpServerStreamSettingsView.swift in Sources */,
 				0359F8EC2BD3DA61005BFDA8 /* RTMPConnection.swift in Sources */,
 				03D2B0E02C11BD9D0051BFB5 /* SrtlaServerSettingsView.swift in Sources */,
@@ -3236,6 +3260,7 @@
 				03A01ACE2B9F738200D20AE3 /* CacheImage.swift in Sources */,
 				031C15C52B9340FB00BA967D /* AudioLevelView.swift in Sources */,
 				C7E682562BC2E3FE004EB747 /* ThermalStateView.swift in Sources */,
+				03B21A3B2CD09A6200E22590 /* PadelScoreboardView.swift in Sources */,
 				03B89D9A2B92DDA80022EAE7 /* ChatView.swift in Sources */,
 				03DC9DB02C4F846D005E2104 /* CMBlockBuffer+Extension.swift in Sources */,
 				03ECDF4B2B8E4E5F00BD920E /* MainView.swift in Sources */,
@@ -3289,6 +3314,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				03EC1E782CBEE477009AEAB1 /* it */,
+				033FD7182CC52E1D0073C6EC /* de */,
 			);
 			name = AppShortcuts.strings;
 			sourceTree = "<group>";
@@ -3542,7 +3568,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.385.0;
+				MARKETING_VERSION = 0.387.0;
 				MTL_HEADER_SEARCH_PATHS = "$(HEADER_SEARCH_PATHS)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.eerimoq.Mobs;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -3597,7 +3623,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.385.0;
+				MARKETING_VERSION = 0.387.0;
 				MTL_HEADER_SEARCH_PATHS = "$(HEADER_SEARCH_PATHS)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.eerimoq.Mobs;
 				PRODUCT_NAME = "$(TARGET_NAME)";

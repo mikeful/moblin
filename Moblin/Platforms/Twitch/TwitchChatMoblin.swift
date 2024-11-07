@@ -82,11 +82,84 @@ private class Badges {
     }
 }
 
+private class Cheermotes {
+    private var channelId: String = ""
+    private var accessToken: String = ""
+    private var emotes: [String: [TwitchApiGetCheermotesDataTier]] = [:]
+    private var tryFetchAgainTimer: DispatchSourceTimer?
+
+    func start(channelId: String, accessToken: String) {
+        self.channelId = channelId
+        self.accessToken = accessToken
+        guard !accessToken.isEmpty else {
+            return
+        }
+        tryFetch()
+    }
+
+    func stop() {
+        stopTryFetchAgainTimer()
+    }
+
+    func tryFetch() {
+        startTryFetchAgainTimer()
+        TwitchApi(accessToken: accessToken).getCheermotes(broadcasterId: channelId) { datas in
+            guard let datas else {
+                return
+            }
+            DispatchQueue.main.async {
+                for data in datas {
+                    self.emotes[data.prefix.lowercased()] = data.tiers
+                }
+                self.stopTryFetchAgainTimer()
+            }
+        }
+    }
+
+    private func startTryFetchAgainTimer() {
+        tryFetchAgainTimer = DispatchSource.makeTimerSource(queue: DispatchQueue.main)
+        tryFetchAgainTimer!.schedule(deadline: .now() + 30)
+        tryFetchAgainTimer!.setEventHandler { [weak self] in
+            self?.tryFetch()
+        }
+        tryFetchAgainTimer!.activate()
+    }
+
+    private func stopTryFetchAgainTimer() {
+        tryFetchAgainTimer?.cancel()
+        tryFetchAgainTimer = nil
+    }
+
+    func getUrlAndBits(word: String) -> (URL, Int)? {
+        let word = word.lowercased().trim()
+        for (prefix, tiers) in emotes {
+            guard let regex = try? Regex("\(prefix)(\\d+)", as: (Substring, Substring).self) else {
+                continue
+            }
+            guard let match = try? regex.wholeMatch(in: word) else {
+                continue
+            }
+            guard let bits = Int(match.output.1) else {
+                continue
+            }
+            guard let tier = tiers.reversed().first(where: { bits >= $0.min_bits }) else {
+                continue
+            }
+            guard let url = URL(string: tier.images.dark.static_.two) else {
+                continue
+            }
+            return (url, bits)
+        }
+        return nil
+    }
+}
+
 final class TwitchChatMoblin {
     private var model: Model
     private var webSocket: WebSocketClient
     private var emotes: Emotes
     private var badges: Badges
+    private var cheermotes: Cheermotes
     private var channelName: String
 
     init(model: Model) {
@@ -94,6 +167,7 @@ final class TwitchChatMoblin {
         channelName = ""
         emotes = Emotes()
         badges = Badges()
+        cheermotes = Cheermotes()
         webSocket = .init(url: URL(string: "wss://irc-ws.chat.twitch.tv")!)
     }
 
@@ -109,6 +183,7 @@ final class TwitchChatMoblin {
             settings: settings
         )
         badges.start(channelId: channelId, accessToken: accessToken)
+        cheermotes.start(channelId: channelId, accessToken: accessToken)
         webSocket = .init(url: URL(string: "wss://irc-ws.chat.twitch.tv")!)
         webSocket.delegate = self
         webSocket.start()
@@ -122,6 +197,7 @@ final class TwitchChatMoblin {
     func stopInternal() {
         emotes.stop()
         badges.stop()
+        cheermotes.stop()
         webSocket.stop()
     }
 
@@ -146,7 +222,8 @@ final class TwitchChatMoblin {
         let segments = createSegments(
             text: text,
             emotes: emotes,
-            emotesManager: self.emotes
+            emotesManager: self.emotes,
+            bits: message.bits
         )
         model.appendChatMessage(
             platform: .twitch,
@@ -160,8 +237,13 @@ final class TwitchChatMoblin {
             isAction: isAction,
             isSubscriber: message.subscriber,
             isModerator: message.moderator,
+            bits: message.bits,
             highlight: createHighlight(message: message)
         )
+    }
+
+    func createSegmentsNoTwitchEmotes(text: String, bits: String?) -> [ChatPostSegment] {
+        return createSegments(text: text, emotes: [], emotesManager: emotes, bits: bits)
     }
 
     private func createHighlight(message: ChatMessage) -> ChatHighlight? {
@@ -170,16 +252,14 @@ final class TwitchChatMoblin {
                 kind: .other,
                 color: .green,
                 image: "horn.blast",
-                title: String(localized: "Announcement"),
-                skipTextToSpeech: false
+                title: String(localized: "Announcement")
             )
         } else if message.firstMessage {
             return .init(
                 kind: .firstMessage,
                 color: .yellow,
                 image: "bubble.left",
-                title: String(localized: "First time chatter"),
-                skipTextToSpeech: false
+                title: String(localized: "First time chatter")
             )
         } else {
             return nil
@@ -269,7 +349,8 @@ final class TwitchChatMoblin {
 
     private func createSegments(text: String,
                                 emotes: [ChatMessageEmote],
-                                emotesManager: Emotes) -> [ChatPostSegment]
+                                emotesManager: Emotes,
+                                bits: String?) -> [ChatPostSegment]
     {
         var segments: [ChatPostSegment] = []
         var id = 0
@@ -282,7 +363,32 @@ final class TwitchChatMoblin {
                 segments.append(segment)
             }
         }
+        if bits != nil {
+            segments = replaceCheermotes(segments: segments)
+        }
         return segments
+    }
+
+    private func replaceCheermotes(segments: [ChatPostSegment]) -> [ChatPostSegment] {
+        var newSegments: [ChatPostSegment] = []
+        guard var id = segments.last?.id else {
+            return newSegments
+        }
+        for segment in segments {
+            guard let text = segment.text else {
+                newSegments.append(segment)
+                continue
+            }
+            guard let (url, bits) = cheermotes.getUrlAndBits(word: text) else {
+                newSegments.append(segment)
+                continue
+            }
+            id += 1
+            newSegments.append(.init(id: id, url: url))
+            id += 1
+            newSegments.append(.init(id: id, text: "\(bits) "))
+        }
+        return newSegments
     }
 }
 
