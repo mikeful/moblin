@@ -31,7 +31,6 @@ private struct ReplayControlsInterval: View {
                    model.setReplayPosition(start: 30 - $0)
                }
                .rotationEffect(.degrees(180))
-               .disabled(model.selectedReplayId == nil)
         Text("\(Int(model.replayStartFromEnd))s")
             .frame(width: 30)
             .font(.body)
@@ -106,7 +105,7 @@ private struct ReplayControlsSaveButton: View {
         } else {
             Button {
                 if model.isRecording {
-                    model.saveReplay()
+                    _ = model.saveReplay()
                 } else {
                     model.makeToast(title: String(localized: "Can only save replay when recording"))
                 }
@@ -178,11 +177,9 @@ private struct ReplayHistory: View {
         ScrollView(.horizontal) {
             LazyHStack {
                 if model.replaysStorage.database.replays.isEmpty {
-                    Image(systemName: "photo.artframe")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .cornerRadius(5)
-                        .frame(height: 68)
+                    Text("No replays saved")
+                        .padding([.leading], 30)
+                        .foregroundColor(.white)
                 }
                 ForEach(model.replaysStorage.database.replays) { replay in
                     ReplayHistoryItem(replay: replay)
